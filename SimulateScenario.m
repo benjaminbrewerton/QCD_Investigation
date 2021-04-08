@@ -49,7 +49,8 @@ end
 %% Define Transition Matrices for state Alpha and Beta
 
 % Form the Discrete Time Markov Chains for each sensor space
-% Since in state alpha, only a singular sensor is modelled:
+
+% Since in state alpha, a singular non-sensed state is modelled:
 A_alpha = dtmc([1]);
 
 % In state beta, there are n_sensors nodes, so to create a random
