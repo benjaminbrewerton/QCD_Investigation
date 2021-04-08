@@ -1,3 +1,8 @@
+%% Environment Clearing
+clc
+close all
+clear vars
+
 %% Begin definition of network variables
 
 % Number of sensors
@@ -43,9 +48,64 @@ end
 
 %% Define Transition Matrices for state Alpha and Beta
 
+% Form the Discrete Time Markov Chains for each sensor space
 % Since in state alpha, only a singular sensor is modelled:
-A_alpha = 1;
+A_alpha = dtmc([1]);
 
 % In state beta, there are n_sensors nodes, so to create a random
 % transition matrix
 A_beta = mcmix(n_sensors);
+
+% Plot the Alpha Sensor space transition probabilities
+figure
+graphplot(A_alpha,'LabelEdges',true)
+title('Pre-Change Transition Probability')
+% Plot the Beta Sensor space transition probabilities
+figure
+graphplot(A_beta,'ColorEdges',true,'LabelEdges',true)
+title('Post-Change Transition Probabilities')
+
+%% Define the Normal Distributions for each sensing node
+
+% Assume the sensors observation measurements are i.i.d.
+
+% Each distribution parameter can be accessed with the node's index
+
+% Define the means of each sensor, here we just use 0 for each sensor
+dist_mean = repelem(0,n_sensors);
+
+% Define the standard deviations of each sensor using a randomly generated
+% distribution
+dist_devs = rand(1,n_sensors);
+
+% Generate randomised observation data derived from the normal
+% distributions for each sensor node. Store the data as a matrix with each
+% row being a sensor's observation data and the column's being the samples
+y = zeros(n_sensors,n_samples);
+for i = [1:n_sensors]
+    % Initialise the distribution for each sensor node
+    current_dist = makedist('normal',dist_mean(i),dist_devs(i));
+    
+    % Pull n_samples worth of randomised data from the established
+    % distribution
+    y(i,:) = random(current_dist,1,n_samples);
+end
+
+% Plot the histogram of one of the sensor's generated samples
+sensor_plot = randi([1 n_sensors]);
+figure
+histfit(y(sensor_plot,:))
+title(['Histogram of sensor ' num2str(sensor_plot)])
+ylabel('Sample Count')
+xlabel('Value Magnitude')
+
+% Also plot the generated samples vs. sample iteration
+figure
+plot([1:n_samples], y(sensor_plot,:))
+title(['Generated Values vs. Sample Count of sensor ' num2str(sensor_plot)])
+xlabel('Sample Count')
+ylabel('Value Magnitude')
+
+clearvars sensor_plot
+
+%% Determine the probability of 
