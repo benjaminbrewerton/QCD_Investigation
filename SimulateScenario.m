@@ -28,6 +28,9 @@ end
 % sensors being affected by this same statistical change
 nu_sensors(randi([1 n_sensors])) = nu;
 
+% Generate the sensor's change order to know which sensor's changepoint is
+% first affected, then the subsequent changepoints after that
+[~,nu_order] = sort(nu_sensors);
 
 %% Define Sensor States
 
@@ -46,16 +49,31 @@ for i = [1:n_sensors]
    S_beta(:,i) = generateIndicatorVector(i,n_sensors);
 end
 
-%% Define Transition Matrices for state Alpha and Beta
+%% Define Transition Matrices for states
 
 % Form the Discrete Time Markov Chains for each sensor space
 
 % Since in state alpha, a singular non-sensed state is modelled:
 A_alpha = dtmc([1]);
 
+% Define a transition modifier which models what the probability is of a
+% detected object moving outside of the current state
+P_move = 0.02;
+
 % In state beta, there are n_sensors nodes, so to create a random
 % transition matrix
-A_beta = mcmix(n_sensors);
+% Uncomment the line below for a fully randomised state transition matrix
+%A_beta = mcmix(n_sensors);
+
+% This beta DTMC is formed from the P_move variable on the diagonal and all
+% other values are P_move/2
+trans_beta = diag(repelem(1 - P_move, n_sensors));
+trans_beta(trans_beta == 0) = P_move / 2;
+A_beta = dtmc(trans_beta);
+
+% For transition state nu, assume that the probability for the state to
+% tranisition to the states in space beta is equal
+A_nu = ones(1,n_sensors) ./ n_sensors;
 
 % Plot the Alpha Sensor space transition probabilities
 figure
@@ -70,27 +88,58 @@ title('Post-Change Transition Probabilities')
 
 % Assume the sensors observation measurements are i.i.d.
 
+% Each sensor's default distribution without being affected by a target
+% will be a standard normal distribution with sigma = 1 and mean = 0
+dist_mean_unaffected = 0;
+dist_dev_unaffected = 1;
+
 % Each distribution parameter can be accessed with the node's index
 
 % Define the means of each sensor, here we just use 0 for each sensor
 dist_mean = repelem(0,n_sensors);
 
 % Define the standard deviations of each sensor using a randomly generated
-% distribution
-dist_devs = rand(1,n_sensors);
+% distribution which are 1 <= sigma <= 2
+dist_devs = 1 + rand(1,n_sensors);
 
 % Generate randomised observation data derived from the normal
 % distributions for each sensor node. Store the data as a matrix with each
 % row being a sensor's observation data and the column's being the samples
 y = zeros(n_sensors,n_samples);
-for i = [1:n_sensors]
-    % Initialise the distribution for each sensor node
+
+for i = nu_order([1:n_sensors])
+    % Get the current iteration of nu_order
+    [~,j] = min(abs(nu_order - i));
+    
+    % Define the non-affected sensor's distribution
+    y(i,:) = random(makedist('normal',dist_mean_unaffected,dist_dev_unaffected),1,n_samples);
+    
+    % Initialise the affected distribution for each sensor node
     current_dist = makedist('normal',dist_mean(i),dist_devs(i));
     
+    % Define where in the distributions to insert the affected node
+    % distribution samples
+    y_a_start = nu_sensors(i);
+    y_a_stop = -1;
+    
+    % Use an if statement to check whether there is another changepoint
+    % beyond the current one in the system
+    if j < n_sensors
+        y_a_stop = nu_sensors(nu_order(j+1));
+    else
+        y_a_stop = n_samples + 1; % + 1 to account for the sample overlap prevention on L~126
+    end
+    
+    disp(['sensor: ' num2str(i) ' at index: ' num2str(j) ', change: ' num2str(y_a_start) ', stop: ' num2str(y_a_stop-1)]);
+    
     % Pull n_samples worth of randomised data from the established
-    % distribution
-    y(i,:) = random(current_dist,1,n_samples);
+    % distribution for when the sensor is affected by a target
+    y(i,y_a_start : y_a_stop - 1) = random(current_dist,1,y_a_stop - y_a_start);
 end
+
+% Define another observation variable y_nu which contain the observations
+% taken after the changepoint has occurred
+y_nu = y(:,nu:n_samples);
 
 % Plot the histogram of one of the sensor's generated samples
 sensor_plot = randi([1 n_sensors]);
@@ -107,7 +156,8 @@ title(['Generated Values vs. Sample Count of sensor ' num2str(sensor_plot)])
 xlabel('Sample Count')
 ylabel('Value Magnitude')
 
-clearvars sensor_plot
+% Clean up the workspace
+clearvars sensor_plot current_dist
 
 %% Determine the probability of each observation
 
@@ -118,4 +168,52 @@ Z = zscore(y,1,2);
 % equal to a randomly generated variable X
 P_z = normcdf(Z);
 
-%% Generate the States of the Markov Chain
+%% Define the probabilities of specific events
+
+% There is no pre-change state dependence, such that rho is constant for
+% all states in the state spaces
+
+% Rho is the probability that an object will enter the network
+rho = 5e-4;
+
+% Define the geometric prior to represent the probability of the state not changing
+pi = (1-rho).^((1:n_samples) - 1) * rho;
+
+% The probability that the network will tranisition from state alpha to
+% beta
+P_v = rho *A_nu;
+
+%% Generate the state randoms
+
+% Since before the changepoint, the state variables in space alpha are not
+% relevant to the problem and do not have to be simulated.
+
+% Calculate A to determine the state variables X
+% Use the definition where rho is constant for all states
+A = dtmc([(1-rho)*A_alpha.P P_v ; zeros(n_sensors,1) A_beta.P], ...
+    'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
+
+% Display the transition probabilities of the overall system
+figure
+graphplot(A,'ColorEdges',true)
+title('Holistic System Transition Probabilities')
+
+% Simulate the entire scenarios markov chain state transitions
+X_sys = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
+samples_escape = length(X_sys(X_sys == 1)) + 1; % + 1 for being inclusive of the transition sample
+% Print the result
+disp(['It took ' num2str(samples_escape) ' iterations to transition to space beta']);
+
+% Define the M vector as being 1 when the changepoint has been reached and
+% 0 when it has not yet been reached
+M = zeros(1,n_samples);
+M(X_sys > 1) = 1;
+
+% Assume that the when the space transitions from alpha to beta that the
+% simulation begins at state 1
+X = simulate(A_beta, n_samples - nu);
+
+% Calculate the mode process transition dtmc
+% A_M = dtmc([1-rho rho ; 0 1]);
+% Simulate A_M
+% M = simulate(A_M, n_samples);
