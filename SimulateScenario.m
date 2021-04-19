@@ -14,23 +14,27 @@ n_samples = 1e5;
 % Generate the primary changepoint of the system which will transition the
 % state from one to another
 % Generate a random variable between 25% and 50% of the sample range
-nu = randi([n_samples/4 n_samples/2]);
+nu_initial = randi([n_samples/4 n_samples/2]);
 
 % Generate a random changepoint (nu) for each sensing node that falls a
 % minimum of 1000 samples from the primary system changepoint
 nu_sensors = zeros(1,n_sensors);
 for i = [1:n_sensors]
-    nu_sensors(i) = randi([nu+1e3 3/4*n_samples]);
+    nu_sensors(i) = randi([nu_initial+1e3 3/4*n_samples]);
 end
 
 % Override one of the sensors to be affected by the primary changepoint as
 % would be expected by an object entering a sensor network and one of the
 % sensors being affected by this same statistical change
-nu_sensors(randi([1 n_sensors])) = nu;
+nu_sensors(randi([1 n_sensors])) = nu_initial;
 
 % Generate the sensor's change order to know which sensor's changepoint is
 % first affected, then the subsequent changepoints after that
 [~,nu_order] = sort(nu_sensors);
+
+% Generate a nu matrix which defines the changepoint (column 1) and ends of
+% statistical change (column 2)
+nu = zeros(n_sensors,2);
 
 %% Define Sensor States
 
@@ -75,6 +79,10 @@ A_beta = dtmc(trans_beta);
 % tranisition to the states in space beta is equal
 A_nu = ones(1,n_sensors) ./ n_sensors;
 
+% Define the M_X vector as being 1 when the changepoint has been reached and
+% 0 when it has not yet been reached for each sensor sampling
+M = zeros(n_sensors,n_samples);
+
 % Plot the Alpha Sensor space transition probabilities
 figure
 graphplot(A_alpha,'LabelEdges',true)
@@ -115,7 +123,9 @@ for i = nu_order([1:n_sensors])
     y(i,:) = random(makedist('normal',dist_mean_unaffected,dist_dev_unaffected),1,n_samples);
     
     % Initialise the affected distribution for each sensor node
-    current_dist = makedist('normal',dist_mean(i),dist_devs(i));
+    %current_dist = makedist('normal',dist_mean(i),dist_devs(i));
+    stat_modifier = 1.5;
+    current_dist = makedist('normal',dist_mean_unaffected,dist_dev_unaffected*stat_modifier);
     
     % Define where in the distributions to insert the affected node
     % distribution samples
@@ -130,11 +140,17 @@ for i = nu_order([1:n_sensors])
         y_a_stop = n_samples + 1; % + 1 to account for the sample overlap prevention on L~126
     end
     
+    % Update the nu matrix to use the new changepoint stop points
+    nu(j,:) = [y_a_start y_a_stop];
+    
+    % Update M to reflect the changepoint for each node
+    M(j,y_a_start:y_a_stop) = 1;
+    
     disp(['sensor: ' num2str(i) ' at index: ' num2str(j) ', change: ' num2str(y_a_start) ', stop: ' num2str(y_a_stop-1)]);
     
     % Pull n_samples worth of randomised data from the established
     % distribution for when the sensor is affected by a target
-    y(i,y_a_start : y_a_stop - 1) = random(current_dist,1,y_a_stop - y_a_start);
+    y(j,y_a_start : y_a_stop - 1) = random(current_dist,1,y_a_stop - y_a_start);
 end
 
 % Define another observation variable y_nu which contain the observations
@@ -151,10 +167,18 @@ xlabel('Value Magnitude')
 
 % Also plot the generated samples vs. sample iteration
 figure
-plot([1:n_samples], y(sensor_plot,:))
-title(['Generated Values vs. Sample Count of sensor ' num2str(sensor_plot)])
-xlabel('Sample Count')
-ylabel('Value Magnitude')
+for i = [1:n_sensors]
+    subplot(n_sensors,1,i)
+    hold on
+    plot([1:n_samples], y(i,:)) % Observation vector plot
+    plot(nu(i,1),0,'r.') % Changepoint
+    plot(nu(i,2),0,'g.') % End Changepoint
+    hold off
+    title(['Gaussian Observation y vs. Samples k of sensor ' num2str(i)])
+    xlabel('Sample k')
+    ylabel('Observation y')
+    xlim([0 n_samples])
+end
 
 % Clean up the workspace
 clearvars sensor_plot current_dist
@@ -204,14 +228,14 @@ samples_escape = length(X_sys(X_sys == 1)) + 1; % + 1 for being inclusive of the
 % Print the result
 disp(['It took ' num2str(samples_escape) ' iterations to transition to space beta']);
 
-% Define the M vector as being 1 when the changepoint has been reached and
+% Define the M_X vector as being 1 when the changepoint has been reached and
 % 0 when it has not yet been reached
-M = zeros(1,n_samples);
-M(X_sys > 1) = 1;
+M_X = zeros(1,n_samples);
+M_X(X_sys > 1) = 1;
 
 % Assume that the when the space transitions from alpha to beta that the
 % simulation begins at state 1
-X = simulate(A_beta, n_samples - nu);
+X = simulate(A_beta, n_samples - nu_initial);
 
 % Calculate the mode process transition dtmc
 % A_M = dtmc([1-rho rho ; 0 1]);
