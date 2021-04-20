@@ -112,6 +112,9 @@ for i = [1:n_sample_change]
     [~,e_node] = min(abs(e(:,i) - 1));
     if last_sensor ~= e_node
         e_trans(e_node,i) = i; % Set the transition to this particular k index
+        if i ~= 1 % NPE Prevention
+            e_trans(last_sensor,i - 1) = i - 1; % Set the endpoint of the change in the sensor's row
+        end
         last_sensor = e_node; % Update the last known sensor change
     end
 end
@@ -126,45 +129,49 @@ clearvars e_node last_sensor
 % Each sensor's default distribution without being affected by a target
 % will be a standard normal distribution with sigma = 1 and mean = 0
 dist_mean = 0;
-dist_dev = 1;
+dist_dev = 0.5;
 
 % The modifier for how much the variance should be increased by when the
 % sensor node is affected by the target object
-stat_modifier = 2;
+stat_modifier = 1.2;
 
 % Each distribution parameter can be accessed with the node's index
-variances = 0.25 + 0.5*rand(1,n_sensors);
+variances = 0.5 + 0.5*rand(1,n_sensors);
 
 % Generate randomised observation data derived from the normal
 % distributions for each sensor node. Store the data as a matrix with each
 % row being a sensor's observation data and the column's being the samples
 y = zeros(n_sensors,n_sample_change);
 
+% Initialise the y matrix to contain default distribution data
 for i = [1:n_sensors]
     % Define the non-affected sensor's distribution
-    y(i,:) = random(makedist('normal',dist_mean,dist_dev),1,n_sample_change);
+    default_dist = makedist('normal',dist_mean,variances(i));
+    y(i,:) = random(default_dist,1,n_sample_change);
+end
+
+% Fetch the transition points from the e_trans matrix
+trans = getTransitionIndices(e_trans,n_sample_change);
+
+% Loop around the transitions and modify the distribution between the
+% changepoints to reflect the affected distributions
+for i = [1:n_sensors]
+    % Get the transitions related to sensor i
+    node_ind = trans(:,1) == i;
+    node_trans = trans(node_ind,:);
     
-    % Initialise the affected distribution for each sensor node
-    current_dist = makedist('normal',2,variances(i)*stat_modifier);
+    % Define the affected distribution
+    affected_dist = makedist('normal',dist_mean,variances(i)*stat_modifier);
     
-    % Get the current e_trans vector
-    e_cur = e_trans(i,:);
-    % Trim the vector such that only non-zero elements remain
-    e_cur(e_cur == 0) = [];
-    
-    % Loop around e_cur and determine where to insert the modified samples
-    for j = 1:2:length(e_cur)
-       % Determine the stop and start points of the current transition
-       affected_start = e_cur(j);
-       if j == length(e_cur)
-           affected_stop = n_sample_change;
-       else
-           affected_stop = e_cur(j + 1) - 1;
-       end
-       
-       % Update the distribution between the affected points
-       y(i,affected_start:affected_stop) = random(current_dist,1, ...
-            affected_stop - affected_start + 1);
+    % Loop around the transitions for sensor i
+    for j = [1:size(node_trans,1)]
+        % Fetch the required indexes
+        cur_node = node_trans(j,1);
+        cur_start = node_trans(j,2);
+        cur_stop = node_trans(j,3);
+        
+        % Update the observations to reflect being affected by the target
+        y(cur_node,cur_start:cur_stop) = random(affected_dist,1,cur_stop-cur_start + 1);
     end
 end
 
@@ -180,34 +187,33 @@ xlabel('Value Magnitude')
 figure
 y_lim = [-4 4];
 for i = [1:n_sensors]
-    % Get the current transition row
-    e_cur = e_trans(i,:);
-    % Trim the transition row to only include non-zero values
-    e_cur(e_cur == 0) = [];
-    
     % Plot the observation vectors and their associated transition points
     subplot(n_sensors,1,i)
     hold on
-    
+
+    % Use the transitions for sensor i to plot where they are occurring on
+    % the observation plots
     % Plot the regions of when the sensor nodes are affected by a different
     % statistical distribution as a faded red rectangle
-    for j = [1:2:length(e_cur)]
-       % Determine the stop and start points of the current transition
-       affected_start = e_cur(j);
-       if j == length(e_cur)
-           affected_stop = n_sample_change;
-       else
-           affected_stop = e_cur(j + 1);
-       end
-       
+    
+    % Get the transitions related to sensor i
+    node_ind = trans(:,1) == i;
+    node_trans = trans(node_ind,:);
+    
+    % Loop around the transitions for sensor i
+    for j = [1:size(node_trans,1)]
+        % Fetch the required indexes
+        cur_node = node_trans(j,1);
+        cur_start = node_trans(j,2);
+        cur_stop = node_trans(j,3);
+        
        % Plot a rectangle that overlays onto the transition points
-       rectangle('Position',[affected_start y_lim(1) ...
-             affected_stop-affected_start y_lim(2)-y_lim(1)], ...
-            'FaceColor',[1 0 0 0.35])
+       rectangle('Position',[cur_start y_lim(1) ...
+             cur_stop-cur_start y_lim(2)-y_lim(1)], ...
+            'FaceColor',[1 0 0 0.3])
     end
     
     plot([1:n_sample_change], y(i,:),'b') % Observation vector plot
-    plot(e_cur(e_cur > 0),0,'g.') % Transition Points
     hold off
 
     title(['Gaussian Observation y vs. Samples k of sensor ' num2str(i)])
@@ -218,7 +224,8 @@ for i = [1:n_sensors]
 end
 
 % Clean up the workspace
-clearvars sensor_plot current_dist %e_cur
+clearvars sensor_plot current_dist cur_node cur_start cur_stop e_cur ...
+    y_lim affected_dist
 
 %% Determine the probability of each observation
 
@@ -228,3 +235,6 @@ Z = zscore(y,1,2);
 % Calculate the probability that each z-value has of being less than or
 % equal to a randomly generated variable X
 P_z = normcdf(Z);
+
+%% Clearup
+clearvars i j
