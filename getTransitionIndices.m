@@ -63,10 +63,8 @@ while i <= n_sample_change
 end
 
 % Trim the rest of the transitions matrix away
-i = 1;
-while i <= n_sample_change && transitions(i,1) > 0
-    i = i + 1;
-end
-transitions(i:n_sample_change,:) = [];
+transitions_ind = transitions(:,1) == 0;
+transitions(transitions_ind,:) = [];
+
 end % Function End
 

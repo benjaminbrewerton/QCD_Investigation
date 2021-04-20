@@ -225,7 +225,7 @@ end
 
 % Clean up the workspace
 clearvars sensor_plot current_dist cur_node cur_start cur_stop e_cur ...
-    y_lim affected_dist
+    y_lim affected_dist node_ind node_trans
 
 %% Determine the probability of each observation
 
