@@ -35,7 +35,7 @@ A_beta = dtmc(trans_beta);
 
 % For transition state nu, assume that the probability for the state to
 % tranisition to the states in space beta is equal
-A_nu = ones(1,n_sensors) ./ n_sensors;
+pi = ones(1,n_sensors) ./ n_sensors;
 
 % Plot the Beta Sensor space transition probabilities
 figure
@@ -51,11 +51,11 @@ title('Post-Change Transition Probabilities')
 rho = 5e-4;
 
 % Define the geometric prior to represent the probability of the state not changing
-pi = (1-rho).^((1:n_samples) - 1) * rho;
+pi_k = (1-rho).^((1:n_samples) - 1) * rho;
 
 % The probability that the network will tranisition from state alpha to
 % beta
-P_v = rho * A_nu;
+A_nu = rho * pi;
 
 %% Generate the state randoms and changepoint
 
@@ -64,7 +64,7 @@ P_v = rho * A_nu;
 
 % Calculate A to determine the state variables X
 % Use the definition where rho is constant for all states
-A = dtmc([(1-rho)*A_alpha.P P_v ; zeros(n_sensors,1) A_beta.P], ...
+A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
     'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
 
 % Display the transition probabilities of the overall system
@@ -214,6 +214,7 @@ for i = [1:n_sensors]
     end
     
     plot([1:n_sample_change], y(i,:),'b') % Observation vector plot
+    %xline(nu,'g-') % System changepoint identifier
     hold off
 
     title(['Gaussian Observation y vs. Samples k of sensor ' num2str(i)])
@@ -229,12 +230,113 @@ clearvars sensor_plot current_dist cur_node cur_start cur_stop e_cur ...
 
 %% Determine the probability of each observation
 
-% Calculate the z-values of all the probabilities in the observation table
-Z = zscore(y,1,2);
+% Calculate the probability density of the observations
+P_nu = zeros(n_sensors,n_sample_change);
 
-% Calculate the probability that each z-value has of being less than or
-% equal to a randomly generated variable X
-P_z = normcdf(Z);
+% Loop around such that indexing can be used to allocate the products of
+% the observations
+% for i = [1:n_sensors]
+%     for j = [1:n_sample_change]
+%        if j < nu
+%            P_nu(i,j) = prod(y(i,1:j));
+%        else
+%            P_nu(i,j) = prod(y(i,nu:j));
+%        end
+% 
+%     end
+% end
 
-%% Clearup
+%% Hidden Markov Model Filter
+
+% To estimate the current state of the HMM from the observation densities,
+% the HMM filter is calculated in O(n^2)
+
+% Initialise the filter recursion by setting the initial conditions of the
+% estimated state sequence to be the distribution of initial DTMC node. As with
+% previous formatting, each row will represent the test statistics for a
+% particular sensor node whilst the columns represent the test statistics
+% for each sensor node at a particular time instance, k
+Z = zeros(n_sensors,n_sample_change);
+
+% Z \in R^{n_sensors \times n_sample_change}
+
+% Initialise the Z test to have the equal distribution pi as the first
+% column entry
+Z(:,1) = pi.';
+
+for i = [2:n_sample_change]
+   % Calculate the B matrix which is the diagonal of the PDF values at
+   % each observation value for a sample k (i)
+   B = zeros(n_sensors,n_sensors);
+   for j = [1:n_sensors]
+       B(j,j) = exp(-(y(j,i) - dist_mean) ./ (2*variances(j)));
+   end
+   
+   % Get the previous estimate
+   Z_prev = Z(:,i-1);
+   
+   % Calculate the new estimate
+   Z_new = B * A_beta.P * Z_prev;
+   
+   % Normalise the new estimate
+   Z_new = inv(sum(Z_new)) * Z_new;
+   
+   % Input the new estimate into the main Z test matrix
+   Z(:,i) = Z_new;
+end
+
+% Cleanup
+clearvars Z_prev Z_new
+
+% Calculate the position of the Z test statistic by taking the maximum
+% value at each sample k to indicate where the estimated state sequence is
+% at
+[~,Z_k] = max(Z, [], 1);
+
+%% Plot the test statistic results
+% Also plot the generated samples vs. sample iteration
+figure
+y_lim = [0 4];
+for i = [1:n_sensors]
+    % Plot the test statistics and their associated transition points
+    subplot(n_sensors,1,i)
+    hold on
+
+    % Use the transitions for sensor i to plot where they are occurring on
+    % the test statistic plots
+    % Plot the regions of when the sensor nodes are affected by a different
+    % statistical distribution as a faded red rectangle
+    
+    % Get the transitions related to sensor i
+    node_ind = trans(:,1) == i;
+    node_trans = trans(node_ind,:);
+    
+    % Loop around the transitions for sensor i
+    for j = [1:size(node_trans,1)]
+        % Fetch the required indexes
+        cur_node = node_trans(j,1);
+        cur_start = node_trans(j,2);
+        cur_stop = node_trans(j,3);
+        
+       % Plot a rectangle that overlays onto the transition points
+       rectangle('Position',[cur_start y_lim(1) ...
+             cur_stop-cur_start y_lim(2)-y_lim(1)], ...
+            'FaceColor',[1 0 0 0.3])
+    end
+    
+    plot([1:n_sample_change], Z_k,'b') % Test statistic plot
+    hold off
+
+    title(['Test statistic Z_k vs. Samples k of sensor ' num2str(i)])
+    xlabel('Sample k')
+    ylabel('Test Statistic Node Z_k')
+    xlim([0 n_sample_change])
+    ylim(y_lim)
+end
+
+% Cleanup
+clearvars sensor_plot current_dist cur_node cur_start cur_stop e_cur ...
+    y_lim affected_dist node_ind node_trans
+
+%% Cleanup
 clearvars i j
