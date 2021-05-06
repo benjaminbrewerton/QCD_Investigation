@@ -14,9 +14,6 @@ else
         colour_legend = [colour_legend strcat('{\color[rgb]{', ...
             num2str(cols(i,1)), " ", num2str(cols(i,2)), " ", ...
             num2str(cols(i,3)), " 0.3", "} ■ } ", text(i))];
-        
-        %{'{\color{red} o } Red', '{\color{blue} o } Blue', ...
-    %'{\color{black} o } Black'}
     end
 end
 end
