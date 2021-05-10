@@ -17,6 +17,8 @@ n_states = n_states_pre_change + n_sensors;
 % Number of random samples
 n_samples = 1e4;
 
+% For testing
+rng(5);
 %% Define Transition Matrices for states
 
 % Form the Discrete Time Markov Chains for each sensor space
@@ -102,9 +104,6 @@ end
 % Fetch the transition points from the state sequence X
 trans = getTransitionIndices(X);
 
-% Cleanup
-clearvars e_node last_sensor
-
 %% Define the Normal Distributions for each sensing node
 
 % Assume the sensors observation measurements are i.i.d.
@@ -112,41 +111,42 @@ clearvars e_node last_sensor
 % Each sensor's default distribution without being affected by a target
 % will be a standard normal distribution with sigma = 1 and mean = 0
 dist_mean = 0;
-dist_dev = 0.5;
+dist_dev = 0.75;
 
 % The modifier for how much the variance should be increased by when the
 % sensor node is affected by the target object
 stat_modifier = 1.5;
 
 % Each distribution parameter can be accessed with the node's index
-variances = dist_dev + 0.5*rand(1,n_states);
+%variances = dist_dev + 0.5*rand(1,n_states);
+variances = [3 3 3];
+means = [0 1 2];
 
 % Generate randomised observation data derived from the normal
 % distributions for each sensor node. Store the data as a matrix with each
 % row being a sensor's observation data and the column's being the samples
-y = zeros(n_states,n_samples);
+y = zeros(n_sensors,n_samples);
 
 % Populate the y matrix to contain default distribution data. This y
 % matrix contains the observations from the post-change DTMC. Assume that
 % the non-affected state is the distribution of the original state in space
 % alpha
 for i = [1:n_states]
-    y(i,:) = random(makedist('normal',dist_mean,variances(1)),1,n_samples);
+    y(i,:) = random(makedist('normal',dist_mean,dist_dev),1,n_samples);
 end
 
 % Loop around the state sequence vector and update the observation at that
 % state instance to be affected by a distribution shift from nu onwards
 for i = [nu:n_samples]
-    y(X(i),i) = random(makedist('normal',dist_mean,variances(X(i))...
-        * stat_modifier),1,1);
+    y(X(i),i) = random(makedist('normal',means(X(i)-1),variances(X(i)-1)),1,1);
 end
 
 % Also plot the generated samples vs. sample iteration
 figure
-y_lim = [-n_states n_states];
-for i = [1:n_states]
+y_lim = [-2*(max(variances)+max(means)) 2*(max(variances)+max(means))];
+for i = [2:n_states]
     % Plot the observation vectors and their associated transition points
-    subplot(n_states,1,i)
+    subplot(n_sensors,1,i-1)
     hold on
 
     % Use the transitions for sensor i to plot where they are occurring on
@@ -175,7 +175,7 @@ for i = [1:n_states]
     xline(nu,'g-') % System changepoint identifier
     hold off
 
-    title(['Gaussian Observation y vs. Samples k of sensor ' num2str(i)])
+    title(['Gaussian Observation y vs. Samples k of sensor ' num2str(i-1)])
     xlabel('Sample k')
     ylabel('Observation y')
     xlim([0 n_samples])
@@ -209,8 +209,11 @@ for i = [1:n_samples]
     % Get the PDF values for each observation with known non-affected
     % distribution values
     for j = [1:n_states]
-        H(j,:) = (1/(2*pi)) * 1./variances .* ...
-            exp(-(cur_obs(j) - dist_mean).^2 ./ (2*variances));
+        % Check if we are building the entry for the pre-change distribution
+        H(j,1) = (1/(2*pi)) * 1/dist_dev * ...
+            exp(-(cur_obs(j) - dist_mean)^2 / (2*dist_dev));
+        H(j,2:n_states) = (1/(2*pi)) * 1./variances .* ...
+            exp(-(cur_obs(j) - means).^2 ./ (2*variances));
     end
 
     % Take the product of the observation probabilities of the columns in H 
@@ -221,7 +224,7 @@ for i = [1:n_samples]
 end
 
 % Cleanup
-clearvars cur_obs
+%clearvars cur_obs
 
 %% Hidden Markov Model Filter
 
@@ -239,8 +242,12 @@ Z = zeros(n_states,n_samples); % n_states x n_samples
 
 % Initialise the Z test to have the equal distribution pi as the first
 % column entry
-Z(:,1) = [repelem(1/n_states,4)].'; % This needs fixing
-%Z(:,1) = [1 zeros(1,n_sensors)].';
+%Z(:,1) = [repelem(1/n_states,4)].'; % This needs fixing
+Z(:,1) = [1 zeros(1,n_sensors)].';
+
+% Generate the transpose of the A matrix such that is inline with the
+% defintion provided in literature
+AT = A.P.';
 
 for i = [2:n_samples]
    % Calculate the B matrix which is the diagonal of the PDF values at
@@ -251,7 +258,7 @@ for i = [2:n_samples]
    Z_prev = Z(:,i-1);
    
    % Calculate the new estimate
-   Z_new = B_cur * A.P * Z_prev; % Big A matrix
+   Z_new = B_cur * AT * Z_prev; % Big A matrix
    
    % Normalise the new estimate
    Z_ins = inv(sum(Z_new)) * Z_new;
@@ -263,40 +270,56 @@ end
 % Cleanup
 clearvars Z_prev Z_new Z_ins
 
-% Temporary for testing stuff
-% Calculate the position of the Z test statistic by taking the maximum
-% value at each sample k to indicate where the estimated state sequence is
-% at
-[~,Z_k] = max(Z, [], 1);
+%[~,Z_k] = max(Z, [], 1);
 
+% Calculate the Z_k vector by randomly generating values based on the
+% probability distribution of each Z entry
+Z_k = zeros(1,n_samples);
+for i = [1:n_samples]
+     Z_k(i) = randsample([1:n_states], 1, true, Z(:,i));
+end
 %% Plot the test statistic results
-figure
 
-subplot(2,1,1)
-hold on
 % Generate unique colour schemes for the sensors
 %colours = rand(n_sensors, 3); % 1 random for each RGB value
 colours = [1 0 1 ; 1 0 0 ; 0.08 0.5 0 ; 0 0 1];
 
-y_lim = [0 n_states+1];
-% Loop around each sensor to plot the transition points
-for i = [1:n_states]
-    % Get the transitions related to sensor i
-    node_ind = trans(:,1) == i;
-    node_trans = trans(node_ind,:);
+% ===== Plot of each sensor's Z test statistic =====
+figure
 
-    % Loop around each transition point and overlay them with different colours
-    % depending on what node the transition occurred at
-    for j = [1:size(node_trans,1)]
-        % Fetch the required indexes
-        cur_node = node_trans(j,1);
-        cur_start = node_trans(j,2);
-        cur_stop = node_trans(j,3);
-        
-        plot(cur_start:cur_stop, Z_k(cur_start:cur_stop), 'color', colours(cur_node,:))
-    end
+for i = [1:n_states]
+    subplot(n_states,1,i)
     
+    plot([1:n_samples], Z(i,:), 'color', colours(i,:))
+    
+    set(gca, 'color', [0 0.07 0.1 0.2])
+    title(['Test statistic $$\hat{Z}_k^' num2str(i) '$$ vs. Samples k'],'Interpreter','Latex')
+    xlabel('Sample k')
+    ylabel(['$$\hat{Z}_k^' num2str(i) '$$'],'Interpreter','Latex')
+    xlim([0 n_samples])
+    ylim([-0.25 1.25]) % Leave some space in between the top and bottom y-lims
 end
+
+
+% ===== Plot of the system's most likely occurrence sequence =====
+figure
+
+subplot(2,1,1)
+hold on
+
+y_lim = [0 n_states+1];
+
+% Loop around each transition point and overlay them with different colours
+% depending on what node the transition occurred at
+for j = [1:size(trans,1)]
+    % Fetch the required indexes
+    cur_node = trans(j,1);
+    cur_start = trans(j,2);
+    cur_stop = trans(j,3);
+
+    plot(cur_start:cur_stop, Z_k(cur_start:cur_stop), 'color', colours(cur_node,:))
+end
+    
 
 xline(nu,'g-') % System changepoint identifier
 
@@ -305,12 +328,6 @@ hold off
 % Change the y-axis to be in terms of nodes
 yticks([0 1:n_states n_states+1])
 yticklabels(generateAxisLabels('e^~',n_states))
-
-% Create the legend
-text(0.8*n_samples, 7/8*max(y_lim), ...
-    generateColourLegend(colours, ...
-    {'e^\alpha_1', 'e^\beta_1', 'e^\beta_2', 'e^\beta_3'}), ...
-    'EdgeColor', 'k', 'BackgroundColor', 'w')
 
 set(gca, 'color', [0 0.07 0.1 0.2])
 title('Test statistic Z_k vs. Samples k with actual node affected shown')
@@ -360,44 +377,44 @@ ylim(y_lim) % Leave some space in between the top and bottom y-lims
 clearvars cur_node cur_start cur_stop y_lim node_ind node_trans colours
 
 %% Alternate Z_k plot
-figure
-y_lim = [0 n_states+1];
-for i = [1:n_states]
-    % Plot the test statistics and their associated transition points
-    subplot(n_states,1,i)
-    hold on
-
-    % Use the transitions for sensor i to plot where they are occurring on
-    % the test statistic plots
-    % Plot the regions of when the sensor nodes are affected by a different
-    % statistical distribution as a faded red rectangle
-    
-    % Get the transitions related to sensor i
-    node_ind = trans(:,1) == i;
-    node_trans = trans(node_ind,:);
-    
-    % Loop around the transitions for sensor i
-    for j = [1:size(node_trans,1)]
-        % Fetch the required indexes
-        cur_node = node_trans(j,1);
-        cur_start = node_trans(j,2);
-        cur_stop = node_trans(j,3);
-        
-       % Plot a rectangle that overlays onto the transition points
-       rectangle('Position',[cur_start y_lim(1) ...
-             cur_stop-cur_start y_lim(2)-y_lim(1)], ...
-            'FaceColor',[1 0 0 0.3])
-    end
-    
-    plot([1:n_samples], Z_k,'b') % Test statistic plot
-
-    set(gca, 'color', [0 0.07 0.1 0.2])
-    title(['Test statistic Z_k vs. Samples k for affected node ' num2str(i)])
-    xlabel('Sample k')
-    ylabel('Test Statistic Node Z_k')
-    xlim([0 n_samples])
-    ylim(y_lim) % Leave some space in between the top and bottom y-lims
-end
+% figure
+% y_lim = [0 n_states+1];
+% for i = [1:n_states]
+%     % Plot the test statistics and their associated transition points
+%     subplot(n_states,1,i)
+%     hold on
+% 
+%     % Use the transitions for sensor i to plot where they are occurring on
+%     % the test statistic plots
+%     % Plot the regions of when the sensor nodes are affected by a different
+%     % statistical distribution as a faded red rectangle
+%     
+%     % Get the transitions related to sensor i
+%     node_ind = trans(:,1) == i;
+%     node_trans = trans(node_ind,:);
+%     
+%     % Loop around the transitions for sensor i
+%     for j = [1:size(node_trans,1)]
+%         % Fetch the required indexes
+%         cur_node = node_trans(j,1);
+%         cur_start = node_trans(j,2);
+%         cur_stop = node_trans(j,3);
+%         
+%        % Plot a rectangle that overlays onto the transition points
+%        rectangle('Position',[cur_start y_lim(1) ...
+%              cur_stop-cur_start y_lim(2)-y_lim(1)], ...
+%             'FaceColor',[1 0 0 0.3])
+%     end
+%     
+%     plot([1:n_samples], Z_k,'b') % Test statistic plot
+% 
+%     set(gca, 'color', [0 0.07 0.1 0.2])
+%     title(['Test statistic Z_k vs. Samples k for affected node ' num2str(i)])
+%     xlabel('Sample k')
+%     ylabel('Z_k')
+%     xlim([0 n_samples])
+%     ylim(y_lim) % Leave some space in between the top and bottom y-lims
+% end
 
 % % Cleanup
 clearvars cur_node cur_start cur_stop y_lim node_ind node_trans colours
