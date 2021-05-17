@@ -119,8 +119,8 @@ stat_modifier = 1.5;
 
 % Each distribution parameter can be accessed with the node's index
 %variances = dist_dev + 0.5*rand(1,n_states);
-variances = [2 2 2];
-means = [1 2 3];
+variances = [1 1 1];
+means = [2 3 4];
 
 % Generate randomised observation data derived from the normal
 % distributions for each sensor node. Store the data as a matrix with each
@@ -382,9 +382,9 @@ for i = [1:n_states]
     xline(nu,'g-') % System changepoint identifier
 
     set(gca, 'color', [0 0.07 0.1 0.2])
-    title(['Test statistic Z_k vs. Samples k state ' num2str(i)])
-    xlabel('Sample k')
-    ylabel('Z_k')
+    title(['Test Statistic $$Z_k^' num2str(i) '$$ vs. Samples k'],'Interpreter','Latex')
+    xlabel('Sample k','Interpreter','Latex')
+    ylabel(['$$Z_k^' num2str(i) '$$'],'Interpreter','Latex')
     xlim([0 n_samples])
     ylim(y_lim) % Leave some space in between the top and bottom y-lims
     
@@ -393,5 +393,90 @@ end
 
 % % Cleanup
 clearvars cur_node cur_start cur_stop y_lim node_ind node_trans colours
+
+%% Define the Mode Process Vector
+
+% Initialise an empty 2 x n_samples matrix to store the mode process
+% variable
+M = zeros(2, n_samples);
+
+% Use indexing to calculate M_k = M(Z_k)
+% M(1,[1:n_samples] < nu) = Z(1,1:nu-1);
+% M(2,[1:n_samples] >= nu) = 1 - Z(1,nu:n_samples);
+M(1,:) = Z(1,:);
+M(2,:) = 1 - Z(1,:);
+
+%% Cost Function Stopping Time
+
+% Define the penalty each time step
+c = 0.001;
+
+% Start by evaluating the summation term for each time step (tau)
+% The stopping time must be bounded by n_samples as there is no possibility
+% the stopping time can exceed n_samples
+J = zeros(1,n_samples);
+
+% Calculate the cost function at each stopping time by looping aruond the
+% maximum possible stopping time values 1:n_samples
+for i = [1:n_samples]
+    J(i) = c*sum(M(2,1:i)) + M(1,i);
+end
+
+% Determine the expected value at each tau step
+%J = J .* [1:n_samples];
+
+% Determine the value at which J is minimised
+[~,tau_J] = min(J);
+
+%% Infimum Bound Stopping Time
+
+% Define a probability threshold to test for
+h = 0.99;
+
+% Form a set of k values
+k_h = [1:n_samples];
+
+% Get the mode statistic for when the system is in post-change
+M_h = M(2,:);
+% Index the set such that it contains entries of M^2 > h
+k_h = k_h(M_h > h);
+
+% Determine the lower bound of the M_h set to determine the first location
+% of when the test statistic exceeds the probability threshold
+tau_M = min(k_h);
+
+% Cleanup
+clearvars k_h M_h
+
+%% Plot the stopping results
+
+figure
+hold on
+
+plot([1:n_samples],M(2,:)) % Plot likelihood of system in post-change
+plot(nu,M(2,nu),'go') % Plot the change-point
+plot(tau_M,M(2,tau_M),'ro') % Plot the stopping time
+yline(h,'m--') % Plot the detection threshold
+
+set(gca, 'color', [0 0.07 0.1 0.2])
+title('Post-change Mode Process $$M_k^2$$ vs. Samples k','Interpreter','Latex')
+xlabel('Sample k','Interpreter','Latex')
+ylabel('$$M_k^2$$','Interpreter','Latex')
+leg = legend('$$M_k^2$$ -- $$P(X\in S_{\beta})$$',...
+    '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
+    '$$h$$ -- Threshold');
+leg.Interpreter = 'Latex';
+leg.Color = 'w';
+xlim([0 n_samples])
+ylim([-0.1 1.1])
+
+%% Calculate performance parameters
+
+% Average Detection Delay
+ADD = max(0,tau_M - nu);
+
+% Probability of False Alarm
+PFA = 1 - M(2,tau_M);
+
 %% Cleanup
 clearvars i j
