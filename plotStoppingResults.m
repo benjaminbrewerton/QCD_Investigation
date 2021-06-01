@@ -13,10 +13,10 @@ plot(tau,M_hat(2,tau),'ro') % Plot the stopping time
 yline(h,'m--') % Plot the detection threshold
 
 set(gca, 'color', [0 0.07 0.1 0.2])
-title('Post-change Mode Process $$M_k^2$$ vs. Samples k','Interpreter','Latex')
+title('Post-change Mode Process $$\hat{M}_k^2$$ vs. Samples k','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$M_k^2$$','Interpreter','Latex')
-leg = legend('$$M_k^2$$ -- $$P(X\in S_{\beta})$$',...
+leg = legend('$$\hat{M}_k^2$$ -- $$P(X\in S_{\beta})$$',...
     '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
     '$$h$$ -- Threshold');
 leg.Interpreter = 'Latex';
