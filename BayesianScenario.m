@@ -91,7 +91,8 @@ X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
 % DTMC alpha and into DTMC beta
 nu = length(X(X == 1)) + 1; % + 1 for being inclusive of the transition sample
 % Print the result
-disp(['It took ' num2str(nu) ' iterations to transition to space beta']);
+disp(['It took ' num2str(nu) ...
+    ' iterations to transition to the post-change state']);
 
 % Check if the changepoint never occurs
 if nu >= n_samples
