@@ -1,5 +1,5 @@
 function plotObservationData(n_sensors, ...
-    trans, y, nu)
+    trans, y, nu, mean_unaffected)
 % Plot the observation data vs. samples with the number of sensors,
 % transition points of the state vector, observation data and changepoint
 
@@ -36,6 +36,7 @@ for i = [1:n_sensors]
     
     plot([1:n_samples], y(i,:),'b') % Observation vector plot
     xline(nu,'g-') % System changepoint identifier
+    yline(mean_unaffected(i),'y--') % Expected mean value
     hold off
 
     title(['Gaussian Observation y vs. Samples k of sensor ' num2str(i)])
