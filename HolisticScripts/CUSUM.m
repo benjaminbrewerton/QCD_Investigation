@@ -124,7 +124,7 @@ var_unaffected = [1 1 1];
 
 % Each distribution parameter can be accessed with the node's index
 %variances = dist_dev + 0.5*rand(1,n_states);
-mean_affected = [2,3,4];%= [2 3 4];
+mean_affected = [1.1,2.1,3.1];%= [2 3 4];
 var_affected = [1 1 1];
 
 %% Generate randomly distributed values for each sensing node
@@ -167,19 +167,28 @@ plotObservationData(n_sensors,trans,y,nu,mean_unaffected);
 % for each sensor node at a particular time instance, k
 Z_hat = zeros(n_states,n_samples);
 
-% Initialise the Z test to have the equal distribution pi as the first
-% column entry
+% Set the test statistic to start at node 1, which is the pre-change state
+
+% Initialise the test statistic with all entries being 0. Here we are
+% measuring the likelihood of a change, not the probability of being in
+% each state.
 Z_hat(:,1) = [1 zeros(1,n_sensors)].';
 
-% Generate the transpose of the A matrix such that is inline with the
-% defintion provided in literature
+% Intialise the Markovian random matrices for the distributions
+M_mu = 1 - rho;
+M_nu = ones(1, n_sensors) ./ 3;
+
+% Initialise an array S, which contains the CUSUM test statistic
+S = zeros(1,n_samples);
+
+% Transpose the A matrix to align with literature definition
 AT = A.P.';
 
 for i = [2:n_samples]
     % Get the observation vector for a time sample k
     cur_obs = y(:,i);
-
-    % Define a square matrix B_cur of B values whose rows represent the
+    
+    % Define a square matrix B whose values whose rows represent the
     % probability of a singular observation being from the set of all
     % densities in the system
     B = zeros(n_sensors,n_states);
@@ -199,22 +208,32 @@ for i = [2:n_samples]
         % Populate with the affected distribution
         B(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
     end
-    
+
     % Calculate the B matrix which is the diagonal of the PDF values at
     % each observation value for a sample k (i)
     B = diag(prod(B,1));
-
-    % Get the previous estimate
+    
+    % Calculate the probability of each sampled observation having been
+    % generated from the pre and post-change distributions respectively.
+%     P_alpha = prod(exp(-(cur_obs - mean_unaffected.').^2 ./ ...
+%         (2*var_unaffected.')));
+    
+    % Get the previously calculated test statistic
     Z_prev = Z_hat(:,i-1);
-
-    % Calculate the new estimate
+    
+    % Define the new Z test statistic
     Z_new = B * AT * Z_prev; % Big A matrix
-
-    % Normalise the new estimate
-    Z_ins = inv(sum(Z_new)) * Z_new;
-
-    % Input the new estimate into the main Z test matrix
-    Z_hat(:,i) = Z_ins;
+    
+    % Calculate the normalistation factor
+    N = 1 / sum(Z_new);
+    
+    % Insert the new state estimate
+    Z_hat(:,i) = N * Z_new;
+    
+    
+    % Evaluate the test statistic using the CUSUM algorithm under Lorden's
+    % criteria
+    S(i) = max(0, S(i-1) + log(1/N) - log(B(1,1)));
 end
 
 % Cleanup
@@ -222,75 +241,61 @@ clearvars Z_prev Z_new Z_ins B_cur
 
 %% Plot the test statistic results
 
-plotTestStatistics(Z_hat, trans);
+%plotTestStatistics(Z_hat, trans);
 
 
 %% Alternate Z_k plot
 
-plotTestAccuracy(Z_hat, trans, nu);
-
-%% Define the Mode Process Vector
-
-% Initialise an empty 2 x n_samples matrix to store the mode process
-% variable
-M_hat = zeros(2, n_samples);
-
-% Use indexing to calculate M_k = M(Z_k)
-M_hat(1,:) = Z_hat(1,:);
-M_hat(2,:) = 1 - Z_hat(1,:);
-
-%% Cost Function Stopping Time
-
-% Define the penalty each time step
-c = 0.001;
-
-% Start by evaluating the summation term for each time step (tau)
-% The stopping time must be bounded by n_samples as there is no possibility
-% the stopping time can exceed n_samples
-J = zeros(1,n_samples);
-
-% Calculate the cost function at each stopping time by looping aruond the
-% maximum possible stopping time values 1:n_samples
-for i = [1:n_samples]
-    J(i) = c*sum(M_hat(2,1:i)) + M_hat(1,i);
-end
-
-% Determine the expected value at each tau step
-%J = J .* [1:n_samples];
-
-% Determine the value at which J is minimised
-[~,tau_J] = min(J);
+%plotTestAccuracy(Z_hat, trans, nu);
 
 %% Infimum Bound Stopping Time
 
 % Define a probability threshold to test for
-h = 0.99;
+h = 1;
 
 % Form a set of k values
 k_h = [1:n_samples];
 
-% Get the mode statistic for when the system is in post-change
-M_h = M_hat(2,:);
-% Index the set such that it contains entries of M^2 > h
-k_h = k_h(M_h > h);
+% Index the set such that it contains entries of S > h
+k_h = k_h(S > h);
 
 % Determine the lower bound of the M_h set to determine the first location
 % of when the test statistic exceeds the probability threshold
 tau = min(k_h);
 
 % Cleanup
-clearvars k_h M_h
+clearvars k_h
 
 %% Plot the stopping results
-plotStoppingResults(n_samples,nu,tau,M_hat,h);
+
+figure
+hold on
+
+plot([1:n_samples],S) % Plot likelihood of system in post-change
+plot(nu,S(nu),'go') % Plot the change-point
+plot(tau,S(tau),'ro') % Plot the stopping time
+yline(h,'m--') % Plot the detection threshold
+
+set(gca, 'color', [0 0.07 0.1 0.2])
+set(gca, 'YScale', 'log')
+title('CUSUM Test Statistic $$Z_k$$ vs. Samples k','Interpreter','Latex')
+xlabel('Sample k','Interpreter','Latex')
+ylabel('$$Z_k$$','Interpreter','Latex')
+leg = legend('$$Z_k$$ -- $$\log\left(\frac{p_{\beta}\left(N^{-1}_{k|\lambda}\right)}{p_{\alpha}\left(N^{-1}_{k|\lambda}\right)}\right)$$',...
+    '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
+    '$$h$$ -- Threshold');
+leg.Interpreter = 'Latex';
+leg.Color = 'w';
+xlim([0 n_samples])
+ylim([0 5000])
 
 %% Calculate performance parameters
 
-% Average Detection Delay
-ADD = max(0,tau - nu);
-
-% Probability of False Alarm
-PFA = 1 - M_hat(2,tau);
+% % Average Detection Delay
+% ADD = max(0,tau - nu);
+% 
+% % Probability of False Alarm
+% PFA = 1 - M_hat(2,tau);
 
 %% Cleanup
 clearvars i j

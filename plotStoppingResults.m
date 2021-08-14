@@ -7,9 +7,9 @@ function plotStoppingResults(n_samples,nu, ...
 figure
 hold on
 
-plot([1:n_samples],M_hat(2,:)) % Plot likelihood of system in post-change
-plot(nu,M_hat(2,nu),'go') % Plot the change-point
-plot(tau,M_hat(2,tau),'ro') % Plot the stopping time
+plot([1:n_samples],M_hat) % Plot likelihood of system in post-change
+plot(nu,M_hat(nu),'go') % Plot the change-point
+plot(tau,M_hat(tau),'ro') % Plot the stopping time
 yline(h,'m--') % Plot the detection threshold
 
 set(gca, 'color', [0 0.07 0.1 0.2])

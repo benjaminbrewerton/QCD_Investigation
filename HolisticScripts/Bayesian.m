@@ -282,7 +282,7 @@ tau = min(k_h);
 clearvars k_h M_h
 
 %% Plot the stopping results
-plotStoppingResults(n_samples,nu,tau,M_hat,h);
+plotStoppingResults(n_samples,nu,tau,M_hat(2,:),h);
 
 %% Calculate performance parameters
 
