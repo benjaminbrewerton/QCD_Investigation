@@ -218,87 +218,82 @@ for i = [2:n_samples]
 end
 
 %% Markov random matrix method
-
-% Transpose the pre-change transition matrix to reflect the literature
-% definition
-A_beta_T = A_beta.P.';
-
-% Initialise an array S, which contains the CUSUM test statistic
-S_a = zeros(1,n_samples);
-
-% Define the M matrix first entry which contains the densities 
-% for each observation in the post-change event
-M = zeros(n_sensors);
-for j = [1:n_sensors]
-    % Initialise the means and variances for each element
-    cur_vars = var_unaffected;
-    cur_means = mean_unaffected;
-
-    % Modify the mean and dists in position j to reflect the mean 
-    % of the affected distributions
-    cur_means(j) = mean_affected(j);
-    cur_vars(j) = var_affected(j);
-
-    % Populate the M Markov random matrix
-    M(:,j) = exp(-(y(:,1) - cur_means.').^2 ./ (2*cur_vars.'));
-end
-
-% Initialise the M matrix with the diagonals of transition densities
-M_nu = diag(prod(M,1)) * (ones(n_sensors, 1) ./ 3);
-
-for i = [2:n_samples]
-    % Get the observation vector for a time sample k
-    cur_obs = y(:,i);
-    
-    for j = [1:n_sensors]
-        % Initialise the means and variances for each element
-        cur_vars = var_unaffected;
-        cur_means = mean_unaffected;
-        
-        % Modify the mean and dists in position j to reflect the mean 
-        % of the affected distributions
-        cur_means(j) = mean_affected(j);
-        cur_vars(j) = var_affected(j);
-        
-        % Populate the M Markov random matrix
-        M(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
-    end
-    
-    % Calculate the M matrix which is the repeated density at a particular
-    % node across each row
-    M = repelem(prod(M,1).', 1, n_sensors);
-    M = A_beta_T .* M;
-    
-    % Calculate the probability of each sampled observation having been
-    % generated from the pre and post-change distributions respectively.
-    P_alpha = prod(exp(-(cur_obs - mean_unaffected.').^2 ./ ...
-        (2*var_unaffected.')));
-    P_alpha_prev = prod(exp(-(y(:,i-1) - mean_unaffected.').^2 ./ ...
-        (2*var_unaffected.')));
-    
-    % Create a holder value for the previous M value
-    M_nu_prev = M_nu;
-    
-    % Calculate the new M value
-    M_nu = M * M_nu_prev;
-    
-    % Evaluate the test statistic using the CUSUM algorithm under Lorden's
-    % criteria
-    S_a(i) = S_a(i-1) + log(P_alpha / P_alpha_prev) - ...
-        log(norm(M_nu,1) / norm(M_nu_prev,1));
-end
-
-figure
-plot([1:n_samples],S_a)
-
-%% Plot the test statistic results
-
-%plotTestStatistics(Z_hat, trans);
-
-
-%% Alternate Z_k plot
-
-%plotTestAccuracy(Z_hat, trans, nu);
+% 
+% % Transpose the pre-change transition matrix to reflect the literature
+% % definition
+% A_beta_T = A_beta.P.';
+% 
+% % Initialise an array S, which contains the CUSUM test statistic
+% S_a = zeros(1,n_samples);
+% 
+% % Define the M matrix first entry which contains the densities 
+% % for each observation in the post-change event
+% M = zeros(n_sensors);
+% for j = [1:n_sensors]
+%     % Initialise the means and variances for each element
+%     cur_vars = var_unaffected;
+%     cur_means = mean_unaffected;
+% 
+%     % Modify the mean and dists in position j to reflect the mean 
+%     % of the affected distributions
+%     cur_means(j) = mean_affected(j);
+%     cur_vars(j) = var_affected(j);
+% 
+%     % Populate the M Markov random matrix
+%     M(:,j) = exp(-(y(:,1) - cur_means.').^2 ./ (2*cur_vars.'));
+% end
+% 
+% % Initialise the M matrix with the diagonals of transition densities
+% M_nu = diag(prod(M,1)) * (ones(n_sensors, 1) ./ 3);
+% M_mu = 1;
+% 
+% for i = [2:n_samples]
+%     % Get the observation vector for a time sample k
+%     cur_obs = y(:,i);
+%     
+%     for j = [1:n_sensors]
+%         % Initialise the means and variances for each element
+%         cur_vars = var_unaffected;
+%         cur_means = mean_unaffected;
+%         
+%         % Modify the mean and dists in position j to reflect the mean 
+%         % of the affected distributions
+%         cur_means(j) = mean_affected(j);
+%         cur_vars(j) = var_affected(j);
+%         
+%         % Populate the M Markov random matrix
+%         M(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
+%     end
+%     
+%     % Calculate the M matrix which is the repeated density at a particular
+%     % node across each row
+%     M = repelem(prod(M,1).', 1, n_sensors);
+%     M = A_beta_T .* M;
+%     
+%     % Calculate the probability of each sampled observation having been
+%     % generated from the pre and post-change distributions respectively.
+%     P_alpha = prod(exp(-(cur_obs - mean_unaffected.').^2 ./ ...
+%         (2*var_unaffected.')));
+%     
+%     % Create a holder value for the previous M value
+%     M_nu_prev = M_nu;
+%     M_mu_prev = M_mu;
+%     
+%     % Calculate the new M value
+%     M_nu = M * M_nu_prev;
+%     M_mu = P_alpha * M_mu;
+%     
+%     % Evaluate the test statistic using the CUSUM algorithm under Lorden's
+%     % criteria
+%     S_a(i) = S_a(i-1) + log(norm(M_mu,1) / norm(M_mu_prev,1)) - ...
+%         log(norm(M_nu,1) / norm(M_nu_prev,1));
+%     
+%     assert(M_mu ~= 0 && norm(M_nu,1) ~= 0, ...
+%         "CUSUM statistics fell to 0 at sample " + num2str(i));
+% end
+% 
+% figure
+% plot([1:n_samples],S_a)
 
 %% Infimum Bound Stopping Time
 
@@ -344,8 +339,8 @@ ylim([0 5000])
 %% Calculate performance parameters
 
 % % Average Detection Delay
-% ADD = max(0,tau - nu);
-% 
+ADD = max(0,tau - nu);
+
 % % Probability of False Alarm
 % PFA = 1 - M_hat(2,tau);
 

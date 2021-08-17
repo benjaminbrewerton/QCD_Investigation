@@ -73,7 +73,7 @@ h = waitbar(0, 'Simulation Progress');
 % unaffected and affected distributions
 for i = [1:n_trials]
     for j = [1:n_scenarios]
-        [c_ADD, c_PFA] = BayesianScenario(vars_unaffected(i,:), ...
+        [c_ADD, c_PFA, ~, ~] = BayesianScenario(vars_unaffected(i,:), ...
             var_unaffected,  vars_affected(i,:), var_affected);
         
         % Check if the change was detected at all

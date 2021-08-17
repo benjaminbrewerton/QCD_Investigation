@@ -1,4 +1,4 @@
-function [ADD,PFA,tau,M_hat] = BayesianScenario(mean_unaffected,var_unaffected, ...
+function [ADD,PFA,tau,S] = CUSUMScenario(mean_unaffected,var_unaffected, ...
     mean_affected,var_affected, X, y, nu, h)
 % Produces the Average Delay Detection and Probability of False Alarm from
 % a set of inputted means and variances (unaffected and affected
@@ -83,27 +83,23 @@ end
 
 % To estimate the current state of the HMM from the observation densities,
 % the HMM filter is calculated in O(n^2)
-
-% Initialise the filter recursion by setting the initial conditions of the
-% estimated state sequence to be the distribution of initial DTMC node. As 
-% with previous formatting, each row will represent the test statistics for
-% a particular sensor node whilst the columns represent the test statistics
-% for each sensor node at a particular time instance, k
+ 
 Z_hat = zeros(n_states,n_samples);
-
-% Initialise the Z test to have the equal distribution pi as the first
-% column entry
+ 
+% Set the test statistic to start at node 1, which is the pre-change state
 Z_hat(:,1) = [1 zeros(1,n_sensors)].';
-
-% Generate the transpose of the A matrix such that is inline with the
-% defintion provided in literature
+ 
+% Initialise an array S, which contains the CUSUM test statistic
+S = zeros(1,n_samples);
+ 
+% Transpose the A matrix to align with literature definition
 AT = A.P.';
-
+ 
 for i = [2:n_samples]
     % Get the observation vector for a time sample k
     cur_obs = y(:,i);
-
-    % Define a square matrix B_cur of B values whose rows represent the
+    
+    % Define a square matrix B whose values whose rows represent the
     % probability of a singular observation being from the set of all
     % densities in the system
     B = zeros(n_sensors,n_states);
@@ -112,58 +108,53 @@ for i = [2:n_samples]
         % Initialise the means and variances for each element
         cur_vars = var_unaffected;
         cur_means = mean_unaffected;
-
+ 
         if j ~= 1
         % Modify the mean and dists in position j to reflect the mean 
         % of the affected distributions
         cur_means(j-1) = mean_affected(j-1);
         cur_vars(j-1) = var_affected(j-1);
         end
-
+ 
         % Populate with the affected distribution
         B(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
     end
-    
+ 
     % Calculate the B matrix which is the diagonal of the PDF values at
     % each observation value for a sample k (i)
     B = diag(prod(B,1));
-
-    % Get the previous estimate
+    
+    % Get the previously calculated test statistic
     Z_prev = Z_hat(:,i-1);
-
-    % Calculate the new estimate
+    
+    % Define the new Z test statistic
     Z_new = B * AT * Z_prev; % Big A matrix
-
-    % Normalise the new estimate
-    Z_ins = inv(sum(Z_new)) * Z_new;
-
-    % Input the new estimate into the main Z test matrix
-    Z_hat(:,i) = Z_ins;
+    
+    % Calculate the normalistation factor
+    N = 1 / sum(Z_new);
+    
+    % Insert the new state estimate
+    Z_hat(:,i) = N * Z_new;
+    
+    % Evaluate the test statistic using the CUSUM algorithm under Lorden's
+    % criteria
+    S(i) = max(0, S(i-1) + log(1/N) - log(B(1,1)));
 end
-
-%% Define the Mode Process Vector
-
-% Initialise an empty 2 x n_samples matrix to store the mode process
-% variable
-M_hat = zeros(2, n_samples);
-
-% Use indexing to calculate M_k = M(Z_k)
-M_hat(1,:) = Z_hat(1,:);
-M_hat(2,:) = 1 - Z_hat(1,:);
 
 %% Infimum Bound Stopping Time
 
 % Form a set of k values
 k_h = [1:n_samples];
 
-% Get the mode statistic for when the system is in post-change
-M_h = M_hat(2,:);
-% Index the set such that it contains entries of M^2 > h
-k_h = k_h(M_h > h);
+% Index the set such that it contains entries of S > h
+k_h = k_h(S > h);
 
 % Determine the lower bound of the M_h set to determine the first location
 % of when the test statistic exceeds the probability threshold
 tau = min(k_h);
+
+% Cleanup
+clearvars k_h
 
 %% Calculate performance parameters
 
@@ -171,6 +162,7 @@ tau = min(k_h);
 ADD = max(0,tau - nu);
 
 % Probability of False Alarm
-PFA = 1 - M_hat(2,tau);
+%PFA = 1 - M_hat(2,tau);
+PFA = 0;
 
 end
