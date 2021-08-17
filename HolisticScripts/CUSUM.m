@@ -124,7 +124,7 @@ var_unaffected = [1 1 1];
 
 % Each distribution parameter can be accessed with the node's index
 %variances = dist_dev + 0.5*rand(1,n_states);
-mean_affected = [1.1,2.1,3.1];%= [2 3 4];
+mean_affected = [2,3,4];%= [2 3 4];
 var_affected = [1 1 1];
 
 %% Generate randomly distributed values for each sensing node
@@ -174,10 +174,6 @@ Z_hat = zeros(n_states,n_samples);
 % each state.
 Z_hat(:,1) = [1 zeros(1,n_sensors)].';
 
-% Intialise the Markovian random matrices for the distributions
-M_mu = 1 - rho;
-M_nu = ones(1, n_sensors) ./ 3;
-
 % Initialise an array S, which contains the CUSUM test statistic
 S = zeros(1,n_samples);
 
@@ -213,11 +209,6 @@ for i = [2:n_samples]
     % each observation value for a sample k (i)
     B = diag(prod(B,1));
     
-    % Calculate the probability of each sampled observation having been
-    % generated from the pre and post-change distributions respectively.
-%     P_alpha = prod(exp(-(cur_obs - mean_unaffected.').^2 ./ ...
-%         (2*var_unaffected.')));
-    
     % Get the previously calculated test statistic
     Z_prev = Z_hat(:,i-1);
     
@@ -230,14 +221,83 @@ for i = [2:n_samples]
     % Insert the new state estimate
     Z_hat(:,i) = N * Z_new;
     
-    
     % Evaluate the test statistic using the CUSUM algorithm under Lorden's
     % criteria
     S(i) = max(0, S(i-1) + log(1/N) - log(B(1,1)));
 end
 
-% Cleanup
-clearvars Z_prev Z_new Z_ins B_cur
+%% Markov random matrix method
+
+% Transpose the pre-change transition matrix to reflect the literature
+% definition
+A_beta_T = A_beta.P.';
+
+% Initialise an array S, which contains the CUSUM test statistic
+S_a = zeros(1,n_samples);
+
+% Define the M matrix which contains the densities for each observation
+% in the post-change event
+M = zeros(n_sensors);
+for j = [1:n_sensors]
+    % Initialise the means and variances for each element
+    cur_vars = var_unaffected;
+    cur_means = mean_unaffected;
+
+    % Modify the mean and dists in position j to reflect the mean 
+    % of the affected distributions
+    cur_means(j) = mean_affected(j);
+    cur_vars(j) = var_affected(j);
+
+    % Populate the M Markov random matrix
+    M(:,j) = exp(-(y(:,1) - cur_means.').^2 ./ (2*cur_vars.'));
+end
+
+% Initialise the M matrix with the diagonals of transition densities
+M_nu = diag(prod(M,1));
+
+for i = [2:n_samples]
+    % Get the observation vector for a time sample k
+    cur_obs = y(:,i);
+    
+    for j = [1:n_sensors]
+        % Initialise the means and variances for each element
+        cur_vars = var_unaffected;
+        cur_means = mean_unaffected;
+        
+        % Modify the mean and dists in position j to reflect the mean 
+        % of the affected distributions
+        cur_means(j) = mean_affected(j);
+        cur_vars(j) = var_affected(j);
+        
+        % Populate the M Markov random matrix
+        M(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
+    end
+    
+    % Calculate the M matrix which is the repeated density at a particular
+    % node across each row
+    M = repelem(prod(M,1).', 1, n_sensors);
+    M = A_beta_T .* M;
+    
+    % Calculate the probability of each sampled observation having been
+    % generated from the pre and post-change distributions respectively.
+    P_alpha = prod(exp(-(cur_obs - mean_unaffected.').^2 ./ ...
+        (2*var_unaffected.')));
+    P_alpha_prev = prod(exp(-(y(:,i-1) - mean_unaffected.').^2 ./ ...
+        (2*var_unaffected.')));
+    
+    % Create a holder value for the previous M value
+    M_mu_prev = M_mu;
+    
+    % Calculate the new M value
+    M_nu = M * M_nu_prev;
+    
+    % Evaluate the test statistic using the CUSUM algorithm under Lorden's
+    % criteria
+    S_a(i) = S_a(i-1) + log(P_alpha) - log(norm(M_nu,1));
+end
+
+figure
+plot([1:n_samples],S_a)
 
 %% Plot the test statistic results
 
