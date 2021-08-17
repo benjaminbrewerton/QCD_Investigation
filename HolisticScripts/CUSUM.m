@@ -159,27 +159,18 @@ plotObservationData(n_sensors,trans,y,nu,mean_unaffected);
 
 % To estimate the current state of the HMM from the observation densities,
 % the HMM filter is calculated in O(n^2)
-
-% Initialise the filter recursion by setting the initial conditions of the
-% estimated state sequence to be the distribution of initial DTMC node. As 
-% with previous formatting, each row will represent the test statistics for
-% a particular sensor node whilst the columns represent the test statistics
-% for each sensor node at a particular time instance, k
+ 
 Z_hat = zeros(n_states,n_samples);
-
+ 
 % Set the test statistic to start at node 1, which is the pre-change state
-
-% Initialise the test statistic with all entries being 0. Here we are
-% measuring the likelihood of a change, not the probability of being in
-% each state.
 Z_hat(:,1) = [1 zeros(1,n_sensors)].';
-
+ 
 % Initialise an array S, which contains the CUSUM test statistic
 S = zeros(1,n_samples);
-
+ 
 % Transpose the A matrix to align with literature definition
 AT = A.P.';
-
+ 
 for i = [2:n_samples]
     % Get the observation vector for a time sample k
     cur_obs = y(:,i);
@@ -193,18 +184,18 @@ for i = [2:n_samples]
         % Initialise the means and variances for each element
         cur_vars = var_unaffected;
         cur_means = mean_unaffected;
-
+ 
         if j ~= 1
         % Modify the mean and dists in position j to reflect the mean 
         % of the affected distributions
         cur_means(j-1) = mean_affected(j-1);
         cur_vars(j-1) = var_affected(j-1);
         end
-
+ 
         % Populate with the affected distribution
         B(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
     end
-
+ 
     % Calculate the B matrix which is the diagonal of the PDF values at
     % each observation value for a sample k (i)
     B = diag(prod(B,1));
@@ -235,8 +226,8 @@ A_beta_T = A_beta.P.';
 % Initialise an array S, which contains the CUSUM test statistic
 S_a = zeros(1,n_samples);
 
-% Define the M matrix which contains the densities for each observation
-% in the post-change event
+% Define the M matrix first entry which contains the densities 
+% for each observation in the post-change event
 M = zeros(n_sensors);
 for j = [1:n_sensors]
     % Initialise the means and variances for each element
@@ -253,7 +244,7 @@ for j = [1:n_sensors]
 end
 
 % Initialise the M matrix with the diagonals of transition densities
-M_nu = diag(prod(M,1));
+M_nu = diag(prod(M,1)) * (ones(n_sensors, 1) ./ 3);
 
 for i = [2:n_samples]
     % Get the observation vector for a time sample k
@@ -286,14 +277,15 @@ for i = [2:n_samples]
         (2*var_unaffected.')));
     
     % Create a holder value for the previous M value
-    M_mu_prev = M_mu;
+    M_nu_prev = M_nu;
     
     % Calculate the new M value
     M_nu = M * M_nu_prev;
     
     % Evaluate the test statistic using the CUSUM algorithm under Lorden's
     % criteria
-    S_a(i) = S_a(i-1) + log(P_alpha) - log(norm(M_nu,1));
+    S_a(i) = S_a(i-1) + log(P_alpha / P_alpha_prev) - ...
+        log(norm(M_nu,1) / norm(M_nu_prev,1));
 end
 
 figure
@@ -311,7 +303,7 @@ plot([1:n_samples],S_a)
 %% Infimum Bound Stopping Time
 
 % Define a probability threshold to test for
-h = 1;
+h = 5;
 
 % Form a set of k values
 k_h = [1:n_samples];
