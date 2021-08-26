@@ -342,7 +342,11 @@ ylim([0 5000])
 ADD = max(0,tau - nu);
 
 % % Probability of False Alarm
-% PFA = 1 - M_hat(2,tau);
+
+% Take the assumption that the stopping time is the first time the CUSUM
+% statistic has crossed the threshold since the algorithms execution
+B_comp = -(mean(S(1:tau)) - tau) / (tau + 1);
+PFA = (1 - B_comp) / (mean(S(1:tau)) - B_comp);
 
 %% Cleanup
 clearvars i j

@@ -1,16 +1,10 @@
-function [X, y, nu] = simulate_random_scenario(mean_unaffected,var_unaffected, ...
-    mean_affected,var_affected)
+function [X, y, nu] = simulate_deterministic_scenario(mean_unaffected,var_unaffected, ...
+    mean_affected,var_affected, nu)
 
 %% Begin definition of network variables
 
-% Number of pre-change states
-n_states_pre_change = 1;
-
 % Number of sensors for post-change modelling
 n_sensors = 3;
-
-% Total number of states
-n_states = n_states_pre_change + n_sensors;
 
 % Number of random samples
 n_samples = 1e4;
@@ -44,48 +38,21 @@ pi_k = ones(1,n_sensors) ./ n_sensors;
 % Cleanup
 clearvars trans_beta
 
-%% Define the probabilities of specific events
-
-% There is no pre-change state dependence, such that rho is constant for
-% all states in the state spaces
-
-% Rho is the probability that an object will enter the network
-rho = 5e-4;
-
-% The probability that the network will tranisition from state alpha to
-% beta
-A_nu = rho * pi_k;
-
 %% Generate the state randoms and changepoint
 
-% Since before the changepoint, the state variables in space alpha are not
-% relevant to the problem and do not have to be simulated.
-
-% Calculate A to determine the state variables X
-% Use the definition where rho is constant for all states
-A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
-    'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
-
-% Simulate the entire scenarios markov chain state transitions
-% Assume that the when the space transitions from alpha to beta that the
-% simulation begins at a random state with equal probability of initial
-% state
-% Initialise the sequence to begin at node 1
-X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
-
-% Determine nu (changepoint) as the first time the sequence escapes from
-% DTMC alpha and into DTMC beta
-nu = length(X(X == 1)) + 1; % + 1 for being inclusive of the transition sample
-% Print the result
-disp(['It took ' num2str(nu) ...
-    ' iterations to transition to the post-change state']);
-
-% Check if the changepoint never occurs
-if nu >= n_samples
-   disp(["Error: Changepoint was never reached after " num2str(n_samples) ...
-       " samples. Try again."]);
-   quit
+% Check whether the changepoint is already supplied
+if ~exist('nu', 'var')
+    % Generate a random changepoint between 0 and n_samples / 2
+    nu = randi([1 n_samples / 2]);
 end
+
+% Initialise the state sequence with ones until the changepoint to indicate
+% the system is in the pre-change state
+X = ones(1, n_samples);
+
+% Simulate the rest of the markov chain in the post-change state space
+% using the post-change transition matrices
+X(nu:end) = simulate(A_beta, n_samples - nu) + 1;
 
 %% Generate randomly distributed values for each sensing node
 

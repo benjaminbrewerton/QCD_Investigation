@@ -1,5 +1,5 @@
 function [ADD,PFA,tau,S] = CUSUMScenario(mean_unaffected,var_unaffected, ...
-    mean_affected,var_affected, X, y, nu, h)
+    mean_affected,var_affected, y, nu, h)
 % Produces the Average Delay Detection and Probability of False Alarm from
 % a set of inputted means and variances (unaffected and affected
 % respectively in order). This function assumes a setup of 3 sensors in the
@@ -66,18 +66,6 @@ A_nu = rho * pi_k;
 % Use the definition where rho is constant for all states
 A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
     'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
-
-%% Determine the transition points
-
-% Define a new matrix, e, which will hold a 1 in the row where the current
-% position in the state vector is
-e = zeros(n_states,n_samples);
-
-% Loop around the state vector and place a 1 in the e vector in the
-% appropriate column
-for i = [1:n_samples]
-   e(X(i),i) = 1; 
-end
 
 %% Hidden Markov Model Filter
 
