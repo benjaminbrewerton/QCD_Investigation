@@ -41,9 +41,15 @@ clearvars trans_beta
 %% Generate the state randoms and changepoint
 
 % Check whether the changepoint is already supplied
-if ~exist('nu', 'var')
+if ~exist('nu','var')
     % Generate a random changepoint between 0 and n_samples / 2
-    nu = randi([1 n_samples / 2]);
+    nu = randi([1 n_samples-1]);
+end
+
+% Check if nu is invalid
+while nu >= n_samples
+    disp("Regenerating changepoint of deterministic scenario")
+    nu = randi([1 n_samples]);
 end
 
 % Initialise the state sequence with ones until the changepoint to indicate

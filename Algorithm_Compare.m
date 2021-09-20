@@ -52,14 +52,14 @@ disp(" ")
 % ==== BAYESIAN ====
 % CUSUM
 % Set threshold:
-h_cusum = 5;
-[ADD_CUSUM_B,PFA_CUSUM_B,tau_CUSUM_B,S_B] = CUSUMScenario(mean_unaffected, ...
+h_cusum = 8;
+[ADD_CUSUM_B,MTFA_CUSUM_B,tau_CUSUM_B,S_B] = CUSUMScenario(mean_unaffected, ...
     var_unaffected, mean_affected, var_affected, y_B, nu_B, h_cusum);
 
 % HMM Filter
 % Set threshold:
 h_bay = 0.99;
-[ADD_HMM_B,MTFA_HMM,tau_HMM_B,M_hat_B] = BayesianScenario(mean_unaffected, ...
+[ADD_HMM_B,PFA_HMM_B,tau_HMM_B,M_hat_B] = BayesianScenario(mean_unaffected, ...
     var_unaffected, mean_affected, var_affected, y_B, nu_B, h_bay);
 
 %% GENERATED A DETERMINISTIC CHANGEPOINT SCENARIO
@@ -68,15 +68,16 @@ h_bay = 0.99;
 [X_D, y_D, nu_D] = simulate_deterministic_scenario(mean_unaffected,var_unaffected, ...
     mean_affected,var_affected, nu_B);
 
+%% Fetch the deterministic algorithm's performance
 % ==== DETERMINISTIC ====
-% Deterministic CUSUM
-h_cusum_D = 15;
-[ADD_CUSUM_D,D_PFA_CUSUM_B,tau_CUSUM_D,S_D] = Deterministic_CUSUMScenario(mean_unaffected, ...
-    var_unaffected, mean_affected, var_affected, y_D, h_cusum_D, nu_D);
 
-% Deterministic HMM Filter
-% [ADD_CUSUM_D,D_PFA_CUSUM_B,tau_CUSUM_D,S_D] = Deterministic_CUSUMScenario(mean_unaffected, ...
-%     var_unaffected, mean_affected, var_affected, X_D, y_D, nu_D, h_cusum);
+% CUSUM
+[ADD_CUSUM_D,MTFA_CUSUM_D,tau_CUSUM_D,S_D] = CUSUMScenario(mean_unaffected, ...
+    var_unaffected, mean_affected, var_affected, y_D, nu_D, h_cusum);
+
+% HMM Filter
+[ADD_HMM_D,PFA_HMM_D,tau_HMM_D,M_hat_D] = BayesianScenario(mean_unaffected, ...
+    var_unaffected, mean_affected, var_affected, y_D, nu_D, h_bay);
 %% Plot the findings
 
 % Number of samples
@@ -87,7 +88,7 @@ figure
 % Bayesian Plots
 
 % CUSUM Plot
-subplot(2,2,1)
+subplot(1,2,1)
 hold on
 plot([1:n_samples],S_B) % Plot likelihood of system in post-change
 plot(nu_B,S_B(nu_B),'go') % Plot the change-point
@@ -97,14 +98,14 @@ hold off
 
 set(gca, 'color', [0 0.07 0.1 0.2])
 set(gca, 'YScale', 'log')
-title('Bayesian CUSUM Algorithm $$S_k$$','Interpreter','Latex')
+title('Random $$\nu$$ CUSUM Algorithm $$S_k$$','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$S_k$$','Interpreter','Latex')
 xlim([0 n_samples])
 ylim([0 5000])
 
 % HMM Filter Plot
-subplot(2,2,2)
+subplot(1,2,2)
 hold on
 plot([1:n_samples],M_hat_B(2,:)) % Plot likelihood of system in post-change
 plot(nu_B,M_hat_B(2,nu_B),'go') % Plot the change-point
@@ -113,7 +114,7 @@ yline(h_bay,'m--') % Plot the detection threshold
 hold off
 
 set(gca, 'color', [0 0.07 0.1 0.2])
-title('Bayesian HMM Algorithm $$\hat{M}_k^2$$','Interpreter','Latex')
+title('Random $$\nu$$ HMM Filter Algorithm $$\hat{M}_k^2$$','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$M_k^2$$','Interpreter','Latex')
 xlim([0 n_samples])
@@ -122,8 +123,9 @@ ylim([-0.1 1.1])
 
 % Deterministic Plots
 
+figure
 % CUSUM plot
-subplot(2,2,3)
+subplot(1,2,1)
 hold on
 plot([1:n_samples],S_D) % Plot likelihood of system in post-change
 plot(nu_D,S_D(nu_D),'go') % Plot the change-point
@@ -133,11 +135,27 @@ hold off
 
 set(gca, 'color', [0 0.07 0.1 0.2])
 set(gca, 'YScale', 'log')
-title('Determinstic CUSUM Algorithm $$S_k$$','Interpreter','Latex')
+title('Determinstic $$\nu$$ CUSUM Algorithm $$S_k$$','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$S_k$$','Interpreter','Latex')
 xlim([0 n_samples])
 ylim([0 5000])
+
+% HMM Filter plot
+subplot(1,2,2)
+hold on
+plot([1:n_samples],M_hat_D(2,:)) % Plot likelihood of system in post-change
+plot(nu_D,M_hat_D(2,nu_D),'go') % Plot the change-point
+plot(tau_HMM_D,M_hat_D(2,tau_HMM_D),'ro') % Plot the stopping time
+yline(h_bay,'m--') % Plot the detection threshold
+hold off
+
+set(gca, 'color', [0 0.07 0.1 0.2])
+title('Deterministic $$\nu$$ HMM Filter Algorithm $$\hat{M}_k^2$$','Interpreter','Latex')
+xlabel('Sample k','Interpreter','Latex')
+ylabel('$$M_k^2$$','Interpreter','Latex')
+xlim([0 n_samples])
+ylim([-0.1 1.1])
 
 %% Print results
 
@@ -145,7 +163,10 @@ disp(" ")
 disp("RESULTS:")
 disp("It took the Bayesian CUSUM algorithm " + num2str(ADD_CUSUM_B) + ... 
     " samples to detect the change event");
-disp("It took the Bayesian HMM algorithm " + num2str(ADD_HMM_B) + ...
+disp("It took the Bayesian HMM filter algorithm " + num2str(ADD_HMM_B) + ...
     " samples to detect the change event");
+disp(" ")
 disp("It took the Deterministic CUSUM algorithm " + num2str(ADD_CUSUM_D) + ...
+    " samples to detect the change event");
+disp("It took the Deterministic HMM filter algorithm " + num2str(ADD_HMM_D) + ...
     " samples to detect the change event");

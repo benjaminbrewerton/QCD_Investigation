@@ -43,13 +43,35 @@ A_beta = dtmc(trans_beta);
 % tranisition to the states in space beta is equal
 pi_k = ones(1,n_sensors) ./ n_sensors;
 
-% Plot the Beta Sensor space transition probabilities
-figure
-graphplot(A_beta,'ColorEdges',true,'LabelEdges',true)
-title('Post-Change Transition Probabilities')
-
 % Cleanup
 clearvars trans_beta
+
+%% Generate the state randoms and changepoint
+
+% Check whether the changepoint is already supplied
+if ~exist('nu', 'var')
+    % Generate a random changepoint between 0 and n_samples / 2
+    nu = randi([1 n_samples]);
+end
+
+% Check if nu is invalid
+while nu >= n_samples
+    disp("Regenerating changepoint of deterministic scenario")
+    nu = randi([1 n_samples]);
+end
+
+% Define changepoint as the number of samples
+%nu = n_samples;
+
+% Initialise the state sequence with ones until the changepoint to indicate
+% the system is in the pre-change state
+X = ones(1, n_samples);
+
+if nu < n_samples
+    % Simulate the rest of the markov chain in the post-change state space
+    % using the post-change transition matrices
+    X(nu:end) = simulate(A_beta, n_samples - nu) + 1;
+end
 
 %% Define the probabilities of specific events
 
@@ -63,8 +85,6 @@ rho = 5e-4;
 % beta
 A_nu = rho * pi_k;
 
-%% Generate the state randoms and changepoint
-
 % Since before the changepoint, the state variables in space alpha are not
 % relevant to the problem and do not have to be simulated.
 
@@ -73,31 +93,6 @@ A_nu = rho * pi_k;
 A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
     'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
 
-% Display the transition probabilities of the overall system
-figure
-graphplot(A,'ColorEdges',true)
-title('Holistic System Transition Probabilities')
-
-% Simulate the entire scenarios markov chain state transitions
-% Assume that the when the space transitions from alpha to beta that the
-% simulation begins at a random state with equal probability of initial
-% state
-% Initialise the sequence to begin at node 1
-X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
-
-% Determine nu (changepoint) as the first time the sequence escapes from
-% DTMC alpha and into DTMC beta
-nu = length(X(X == 1)) + 1; % + 1 for being inclusive of the transition sample
-% Print the result
-disp(['It took ' num2str(nu) ...
-    ' iterations to transition to the post-change state']);
-
-% Check if the changepoint never occurs
-if nu >= n_samples
-   disp(["Error: Changepoint was never reached after " num2str(n_samples) ...
-       " samples. Try again."]);
-   quit
-end
 %% Determine the transition points
 
 % Define a new matrix, e, which will hold a 1 in the row where the current
@@ -138,7 +133,7 @@ y = zeros(n_sensors,n_samples);
 % with mean and variances per state as defined in means and vars
 for i = [1:n_samples]
     % Check whether we are in pre or post-change
-    if(i < nu)
+    if(i < nu) || nu == n_samples
         % Generate an unaffected distribution sample
         y(:,i) = sqrt(var_unaffected).' .* randn(n_sensors,1) + ...
             mean_unaffected.';
@@ -160,10 +155,11 @@ plotObservationData(n_sensors,trans,y,nu,mean_unaffected);
 % To estimate the current state of the HMM from the observation densities,
 % the HMM filter is calculated in O(n^2)
  
-Z_hat = zeros(n_states,n_samples);
+Z_hat = zeros(n_sensors,n_samples);
+Z_hat(:,1) = pi_k.';
  
 % Set the test statistic to start at node 1, which is the pre-change state
-Z_hat(:,1) = [1 zeros(1,n_sensors)].';
+% Z_hat(:,1) = [1 zeros(1,n_sensors)].';
  
 % Initialise an array S, which contains the CUSUM test statistic
 S = zeros(1,n_samples);
@@ -178,33 +174,36 @@ for i = [2:n_samples]
     % Define a square matrix B whose values whose rows represent the
     % probability of a singular observation being from the set of all
     % densities in the system
-    B = zeros(n_sensors,n_states);
+    B = zeros(n_sensors);
     
-    for j = [1:n_states]
+    for j = [1:n_sensors]
         % Initialise the means and variances for each element
         cur_vars = var_unaffected;
         cur_means = mean_unaffected;
  
-        if j ~= 1
         % Modify the mean and dists in position j to reflect the mean 
         % of the affected distributions
-        cur_means(j-1) = mean_affected(j-1);
-        cur_vars(j-1) = var_affected(j-1);
-        end
+        cur_means(j) = mean_affected(j);
+        cur_vars(j) = var_affected(j);
  
         % Populate with the affected distribution
-        B(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
+        B(:,j) = (1./sqrt(2*pi*cur_vars)).' .* ...
+            exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
     end
  
     % Calculate the B matrix which is the diagonal of the PDF values at
     % each observation value for a sample k (i)
     B = diag(prod(B,1));
     
+    % Determine the pre-change density likelihood
+    P_alpha = prod((1./sqrt(2*pi*var_unaffected)).' .* ... 
+        exp(-(cur_obs - mean_unaffected.').^2 ./ (2*var_unaffected.')));
+    
     % Get the previously calculated test statistic
     Z_prev = Z_hat(:,i-1);
     
     % Define the new Z test statistic
-    Z_new = B * AT * Z_prev; % Big A matrix
+    Z_new = B * A_beta.P.' * Z_prev; % Big A matrix
     
     % Calculate the normalistation factor
     N = 1 / sum(Z_new);
@@ -214,7 +213,7 @@ for i = [2:n_samples]
     
     % Evaluate the test statistic using the CUSUM algorithm under Lorden's
     % criteria
-    S(i) = max(0, S(i-1) + log(1/N) - log(B(1,1)));
+    S(i) = max(0, S(i-1) + log(1/N) - log(P_alpha));
 end
 
 %% Markov random matrix method
@@ -298,7 +297,7 @@ end
 %% Infimum Bound Stopping Time
 
 % Define a probability threshold to test for
-h = 5;
+h = 8;
 
 % Form a set of k values
 k_h = [1:n_samples];
@@ -325,12 +324,12 @@ yline(h,'m--') % Plot the detection threshold
 
 set(gca, 'color', [0 0.07 0.1 0.2])
 set(gca, 'YScale', 'log')
-title('CUSUM Test Statistic $$Z_k$$ vs. Samples k','Interpreter','Latex')
+title('CUSUM Test Statistic $$\tilde{Z}_k$$ vs. Samples k','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
-ylabel('$$Z_k$$','Interpreter','Latex')
-leg = legend('$$Z_k$$ -- $$\log\left(\frac{p_{\beta}\left(N^{-1}_{k|\lambda}\right)}{p_{\alpha}\left(N^{-1}_{k|\lambda}\right)}\right)$$',...
+ylabel('$$\tilde{Z}_k$$','Interpreter','Latex')
+leg = legend('$$\tilde{Z}_k$$ -- CUSUM Statistic',...
     '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
-    '$$h$$ -- Threshold');
+    '$$h_C$$ -- Threshold');
 leg.Interpreter = 'Latex';
 leg.Color = 'w';
 xlim([0 n_samples])

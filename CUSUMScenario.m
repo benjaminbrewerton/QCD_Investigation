@@ -51,7 +51,7 @@ pi_k = ones(1,n_sensors) ./ n_sensors;
 % all states in the state spaces
 
 % Rho is the probability that an object will enter the network
-rho = 5e-4;
+rho = 4e-4;
 
 % The probability that the network will tranisition from state alpha to
 % beta
@@ -72,14 +72,12 @@ A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
 % To estimate the current state of the HMM from the observation densities,
 % the HMM filter is calculated in O(n^2)
  
-Z_hat = zeros(n_states,n_samples);
- 
-% Set the test statistic to start at node 1, which is the pre-change state
-Z_hat(:,1) = [1 zeros(1,n_sensors)].';
+Z_hat = zeros(n_sensors,n_samples);
+Z_hat(:,1) = pi_k.';
  
 % Initialise an array S, which contains the CUSUM test statistic
 S = zeros(1,n_samples);
- 
+
 % Transpose the A matrix to align with literature definition
 AT = A.P.';
  
@@ -90,33 +88,36 @@ for i = [2:n_samples]
     % Define a square matrix B whose values whose rows represent the
     % probability of a singular observation being from the set of all
     % densities in the system
-    B = zeros(n_sensors,n_states);
+    B = zeros(n_sensors);
     
-    for j = [1:n_states]
+    for j = [1:n_sensors]
         % Initialise the means and variances for each element
         cur_vars = var_unaffected;
         cur_means = mean_unaffected;
  
-        if j ~= 1
         % Modify the mean and dists in position j to reflect the mean 
         % of the affected distributions
-        cur_means(j-1) = mean_affected(j-1);
-        cur_vars(j-1) = var_affected(j-1);
-        end
+        cur_means(j) = mean_affected(j);
+        cur_vars(j) = var_affected(j);
  
         % Populate with the affected distribution
-        B(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
+        B(:,j) = (1./sqrt(2*pi*cur_vars)).' .* ...
+            exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
     end
  
     % Calculate the B matrix which is the diagonal of the PDF values at
     % each observation value for a sample k (i)
     B = diag(prod(B,1));
     
+    % Determine the pre-change density likelihood
+    P_alpha = prod((1./sqrt(2*pi*var_unaffected)).' .* ... 
+        exp(-(cur_obs - mean_unaffected.').^2 ./ (2*var_unaffected.')));
+    
     % Get the previously calculated test statistic
     Z_prev = Z_hat(:,i-1);
     
     % Define the new Z test statistic
-    Z_new = B * AT * Z_prev; % Big A matrix
+    Z_new = B * A_beta.P.' * Z_prev; % Big A matrix
     
     % Calculate the normalistation factor
     N = 1 / sum(Z_new);
@@ -126,7 +127,7 @@ for i = [2:n_samples]
     
     % Evaluate the test statistic using the CUSUM algorithm under Lorden's
     % criteria
-    S(i) = max(0, S(i-1) + log(1/N) - log(B(1,1)));
+    S(i) = max(0, S(i-1) + log(1/N) - log(P_alpha));
 end
 
 %% Infimum Bound Stopping Time
@@ -149,8 +150,14 @@ clearvars k_h
 % Average Detection Delay
 ADD = max(0,tau - nu);
 
-% Probability of False Alarm
+% Mean time to false alarm
 %PFA = 1 - M_hat(2,tau);
 PFA = 0;
 
+if isempty(tau)
+    tau = -1;
+end
+if isempty(ADD)
+    ADD = -1;
+end
 end

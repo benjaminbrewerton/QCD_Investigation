@@ -66,6 +66,12 @@ A_nu = rho * pi_k;
 A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
     'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
 
+% Dummy changepoint
+nu = n_samples + 1;
+
+% Check if the changepoint never occurs
+while nu >= n_samples
+    
 % Simulate the entire scenarios markov chain state transitions
 % Assume that the when the space transitions from alpha to beta that the
 % simulation begins at a random state with equal probability of initial
@@ -76,15 +82,15 @@ X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
 % Determine nu (changepoint) as the first time the sequence escapes from
 % DTMC alpha and into DTMC beta
 nu = length(X(X == 1)) + 1; % + 1 for being inclusive of the transition sample
-% Print the result
-disp(['It took ' num2str(nu) ...
-    ' iterations to transition to the post-change state']);
 
-% Check if the changepoint never occurs
 if nu >= n_samples
-   disp(["Error: Changepoint was never reached after " num2str(n_samples) ...
-       " samples. Try again."]);
-   quit
+    disp(["Changepoint was never reached after " num2str(n_samples) ...
+       " samples. Trying again."]);
+else
+    % Print the result
+    disp(['It took ' num2str(nu) ...
+    ' iterations to transition to the post-change state']);
+end
 end
 
 %% Generate randomly distributed values for each sensing node
