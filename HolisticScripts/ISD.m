@@ -3,101 +3,97 @@ clc
 close all
 clearvars
 
+addpath('..');
+
 %% Begin definition of network variables
 
 % Number of pre-change states
-n_states_pre_change = 1;
+n_states_mu = 3;
 
-% Number of sensors for post-change modelling
-n_sensors = 3;
+% Number of states in the post-change state
+n_states_nu = 3;
 
 % Total number of states
-n_states = n_states_pre_change + n_sensors;
+n_states = n_states_mu + n_states_nu;
 
 % Number of random samples
 n_samples = 1e4;
 
 %% Define Transition Matrices for states
 
-% Form the Discrete Time Markov Chains for each sensor space
-
-% Since in state alpha, a singular non-sensed state is modelled:
-A_alpha = dtmc([1]);
+% Form the Discrete Time Markov Chains for each change space
 
 % Define a transition modifier which models what the probability is of a
 % detected object moving outside of the current state
+% Assume that the probability of transitioning to an adjacent state is
+% equivalent for both spaces.
 P_move = 0.01;
 
-% In state beta, there are n_sensors nodes, so to create a random
-% transition matrix
-% Uncomment the line below for a fully randomised state transition matrix
-%A_beta = mcmix(n_sensors);
+% Form the DTMCs for each change space using the definition from ISD papers
+trans = diag(repelem(1 - P_move, n_states_mu));
+trans(trans == 0) = P_move / (n_states_mu - 1);
+A_alpha = dtmc(trans);
+% Assume both the change space DTMCs operate with the same probabilities of
+% transition
+trans = diag(repelem(1 - P_move, n_states_nu));
+trans(trans == 0) = P_move / (n_states_nu - 1);
+A_beta = dtmc(trans);
 
-% This beta DTMC is formed from the P_move variable on the diagonal and all
-% other values are P_move/2
-trans_beta = diag(repelem(1 - P_move, n_sensors));
-trans_beta(trans_beta == 0) = P_move / (n_sensors - 1);
-A_beta = dtmc(trans_beta);
-
-% For transition state nu, assume that the probability for the state to
-% tranisition to the states in space beta is equal
-pi_k = ones(1,n_sensors) ./ n_sensors;
-
-% Plot the Beta Sensor space transition probabilities
-figure
-graphplot(A_beta,'ColorEdges',true,'LabelEdges',true)
-title('Post-Change Transition Probabilities')
+% Also assume the probability for beginning in each state in the DTMCs is
+% equal
+pi_mu = ones(1,n_states_mu) ./ n_states_mu;
+pi_nu = ones(1,n_states_nu) ./ n_states_nu;
 
 % Cleanup
 clearvars trans_beta
 
-%% Define the probabilities of specific events
+%% Bayesian Probability Space Assumptions
 
-% There is no pre-change state dependence, such that rho is constant for
-% all states in the state spaces
+% These variables are used for Bayesian changepoint modelling.
 
-% Rho is the probability that an object will enter the network
-rho = 5e-4;
+% Rho is the probability that an object will transition between state
+% spaces.
+rho = 5e-3;
 
 % The probability that the network will tranisition from state alpha to
 % beta
-A_nu = rho * pi_k;
+A_mu = rho .* pi_mu;
+A_nu = rho .* pi_nu;
 
 %% Generate the state randoms and changepoint
 
-% Since before the changepoint, the state variables in space alpha are not
-% relevant to the problem and do not have to be simulated.
+% Define the A from literature
+A_lit = [(1-rho)*A_alpha.P (1/n_states_mu).*repelem(A_mu,n_states_mu,1) ; ...
+    (1/n_states_nu).*repelem(A_nu,n_states_nu,1) (1-rho)*A_beta.P];
 
-% Calculate A to determine the state variables X
-% Use the definition where rho is constant for all states
-A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
-    'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
+% Determine the large A matrix which governs 
+A = dtmc(A_lit.');
 
 % Display the transition probabilities of the overall system
 figure
 graphplot(A,'ColorEdges',true)
 title('Holistic System Transition Probabilities')
 
-% Simulate the entire scenarios markov chain state transitions
-% Assume that the when the space transitions from alpha to beta that the
-% simulation begins at a random state with equal probability of initial
-% state
-% Initialise the sequence to begin at node 1
-X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
+% Simulate the augmented HMM established in matrix A.
+% Start from node 1 in the pre-change space to simulate a sensor network
+% that has not yet detected a target.
+X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_states-1)]);
 
-% Determine nu (changepoint) as the first time the sequence escapes from
-% DTMC alpha and into DTMC beta
-nu = length(X(X == 1)) + 1; % + 1 for being inclusive of the transition sample
-% Print the result
-disp(['It took ' num2str(nu) ...
-    ' iterations to transition to the post-change state']);
+% Determine the points at which the HMM transitions between state spaces
+lambda = zeros(1,n_samples);
+lambda(X >= 4) = 1; % Post-change
+lambda(X <= 3) = 0; % Pre-change
+lambda = lambda(2:end) - lambda(1:end-1);
 
-% Check if the changepoint never occurs
-if nu >= n_samples
-   disp(["Error: Changepoint was never reached after " num2str(n_samples) ...
-       " samples. Try again."]);
-   quit
-end
+% Get the state indices of changepoints
+lambda_i = [1:n_samples] .* lambda;
+
+
+% Print the generated changepoints
+% for i = 1:length(nu)
+%     if lambda
+%     disp("Changepoint at 
+% end
 %% Determine the transition points
 
 % Define a new matrix, e, which will hold a 1 in the row where the current
