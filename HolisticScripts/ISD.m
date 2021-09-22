@@ -8,7 +8,7 @@ addpath('..');
 %% Begin definition of network variables
 
 % Number of pre-change states
-n_states_mu = 3;
+n_states_mu = 1;
 
 % Number of states in the post-change state
 n_states_nu = 3;
@@ -45,7 +45,7 @@ pi_mu = ones(1,n_states_mu) ./ n_states_mu;
 pi_nu = ones(1,n_states_nu) ./ n_states_nu;
 
 % Cleanup
-clearvars trans_beta
+clearvars trans
 
 %% Bayesian Probability Space Assumptions
 
@@ -53,7 +53,7 @@ clearvars trans_beta
 
 % Rho is the probability that an object will transition between state
 % spaces.
-rho = 5e-3;
+rho = 1e-3;
 
 % The probability that the network will tranisition from state alpha to
 % beta
@@ -63,8 +63,8 @@ A_nu = rho .* pi_nu;
 %% Generate the state randoms and changepoint
 
 % Define the A from literature
-A_lit = [(1-rho)*A_alpha.P (1/n_states_mu).*repelem(A_mu,n_states_mu,1) ; ...
-    (1/n_states_nu).*repelem(A_nu,n_states_nu,1) (1-rho)*A_beta.P];
+A_lit = [(1-rho).*A_alpha.P (1/n_states_nu).*repelem(A_mu,n_states_mu,n_states_nu) ; ...
+    repelem(A_nu.',n_states_mu,1) (1-rho .* (1/n_states_nu)).*A_beta.P];
 
 % Determine the large A matrix which governs 
 A = dtmc(A_lit.');
@@ -81,30 +81,31 @@ X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_states-1)]);
 
 % Determine the points at which the HMM transitions between state spaces
 lambda = zeros(1,n_samples);
-lambda(X >= 4) = 1; % Post-change
-lambda(X <= 3) = 0; % Pre-change
-lambda = lambda(2:end) - lambda(1:end-1);
+lambda(X >= n_states_nu + 1) = 1; % Post-change
+lambda(X <= n_states_mu) = 0; % Pre-change
+
+% Get the differences in the changepoint vector to determine where these
+% peaks occur. Append a 0 to the front of the vector to indicate the
+% changepoint is detected on the sample of occurrence instead of before.
+% Store as 1 (moving from mu to nu) and -1 (moving from nu to mu).
+lambda = [0 diff(lambda)];
 
 % Get the state indices of changepoints
 lambda_i = [1:n_samples] .* lambda;
+% Remove all zero indices
+lambda_i(lambda_i == 0) = [];
 
 
 % Print the generated changepoints
-% for i = 1:length(nu)
-%     if lambda
-%     disp("Changepoint at 
-% end
-%% Determine the transition points
-
-% Define a new matrix, e, which will hold a 1 in the row where the current
-% position in the state vector is
-e = zeros(n_states,n_samples);
-
-% Loop around the state vector and place a 1 in the e vector in the
-% appropriate column
-for i = [1:n_samples]
-   e(X(i),i) = 1; 
+disp("Generated scenario with changepoints at: ")
+for i = [1:length(lambda_i)]
+   if i ~= length(lambda_i)
+        disp([char(9) num2str(abs(lambda_i(i))) ',']);
+   else
+        disp([char(9) num2str(abs(lambda_i(i))) '.']);
+   end
 end
+%% Determine the transition points for plotting
 
 % Fetch the transition points from the state sequence X
 trans = getTransitionIndices(X);
@@ -115,41 +116,46 @@ trans = getTransitionIndices(X);
 
 % Each sensor's default distribution without being affected by a target
 % will be a standard normal distribution with sigma = 1 and mean = 0
-mean_unaffected = [1,2,3]; %= [1 2 3];
-var_unaffected = [1 1 1];
+mean_mu = [1,2,3]; %= [1 2 3];
+var_mu = [1 1 1];
 
 % Each distribution parameter can be accessed with the node's index
 %variances = dist_dev + 0.5*rand(1,n_states);
-mean_affected = [2,3,4];%= [2 3 4];
-var_affected = [1 1 1];
+mean_nu = [2,3,4];%= [2 3 4];
+var_nu = [1 1 1];
 
 %% Generate randomly distributed values for each sensing node
+
+% Here we assume the number of sensors is equal in the pre-change and
+% post-change scenarios
+n_sensors = max(n_states_mu,n_states_nu);
 
 % Generate randomised observation data derived from the normal
 % distributions for each sensor node. Store the data as a matrix with each
 % row being a sensor's observation data and the column's being the samples
-y = zeros(n_sensors,n_samples);
+y = zeros(n_sensors, n_samples);
 
 % Populate the y matrix with samples taken from a Gaussian distribution
 % with mean and variances per state as defined in means and vars
 for i = [1:n_samples]
-    % Check whether we are in pre or post-change
-    if(i < nu)
+    % Check whether we are in pre-change or post-change states
+    if(X(i) <= n_states_mu)
         % Generate an unaffected distribution sample
-        y(:,i) = sqrt(var_unaffected).' .* randn(n_sensors,1) + ...
-            mean_unaffected.';
+        y(:,i) = sqrt(var_mu).' .* randn(n_sensors,1) + ...
+            mean_mu.';
     else
         % Define the var and mean to generate data with at this sample time
-        means = mean_unaffected; means(X(i)-1) = mean_affected(X(i)-1);
-        vars = var_unaffected; vars(X(i)-1) = var_affected(X(i)-1);
+        means = mean_mu; means(X(i)-1) = mean_nu(X(i)-1);
+        vars = var_mu; vars(X(i)-1) = var_nu(X(i)-1);
 
         % Generate the data using a scaled randn value
         y(:,i) = sqrt(vars).' .* randn(n_sensors,1) + means.';
     end
 end
 
-% Plot the observation data
-plotObservationData(n_sensors,trans,y,nu,mean_unaffected);
+%% Plot the observation data
+
+plotObservationData(n_sensors, trans, y, lambda_i, mean_mu)
 
 %% Hidden Markov Model Filter
 
@@ -167,10 +173,6 @@ Z_hat = zeros(n_states,n_samples);
 % column entry
 Z_hat(:,1) = [1 zeros(1,n_sensors)].';
 
-% Generate the transpose of the A matrix such that is inline with the
-% defintion provided in literature
-AT = A.P.';
-
 for i = [2:n_samples]
     % Get the observation vector for a time sample k
     cur_obs = y(:,i);
@@ -182,14 +184,14 @@ for i = [2:n_samples]
     
     for j = [1:n_states]
         % Initialise the means and variances for each element
-        cur_vars = var_unaffected;
-        cur_means = mean_unaffected;
+        cur_vars = var_mu;
+        cur_means = mean_mu;
 
         if j ~= 1
-        % Modify the mean and dists in position j to reflect the mean 
-        % of the affected distributions
-        cur_means(j-1) = mean_affected(j-1);
-        cur_vars(j-1) = var_affected(j-1);
+            % Modify the mean and dists in position j to reflect the mean 
+            % of the affected distributions
+            cur_means(j-1) = mean_nu(j-1);
+            cur_vars(j-1) = var_nu(j-1);
         end
 
         % Populate with the affected distribution
@@ -204,7 +206,7 @@ for i = [2:n_samples]
     Z_prev = Z_hat(:,i-1);
 
     % Calculate the new estimate
-    Z_new = B * AT * Z_prev; % Big A matrix
+    Z_new = B * A_lit * Z_prev; % Big A matrix
 
     % Normalise the new estimate
     Z_ins = inv(sum(Z_new)) * Z_new;
@@ -218,12 +220,12 @@ clearvars Z_prev Z_new Z_ins B_cur
 
 %% Plot the test statistic results
 
-plotTestStatistics(Z_hat, trans);
+%plotTestStatistics(Z_hat, trans);
 
 
 %% Alternate Z_k plot
 
-plotTestAccuracy(Z_hat, trans, nu);
+plotTestAccuracy(Z_hat, trans, lambda_i);
 
 %% Define the Mode Process Vector
 

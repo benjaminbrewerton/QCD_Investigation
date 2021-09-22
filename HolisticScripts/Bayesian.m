@@ -190,10 +190,10 @@ for i = [2:n_samples]
         cur_means = mean_unaffected;
 
         if j ~= 1
-        % Modify the mean and dists in position j to reflect the mean 
-        % of the affected distributions
-        cur_means(j-1) = mean_affected(j-1);
-        cur_vars(j-1) = var_affected(j-1);
+            % Modify the mean and dists in position j to reflect the mean 
+            % of the affected distributions
+            cur_means(j-1) = mean_affected(j-1);
+            cur_vars(j-1) = var_affected(j-1);
         end
 
         % Populate with the affected distribution

@@ -1,5 +1,6 @@
 function [transitions] = getTransitionIndices(X_seq)
-% Fetch the transitions of the DTMC defined in e_trans
+% Fetch the transitions of the DTMC defined in e_trans with optional change
+% limit defined by delta_lim.
 
 % Get the samples used in e_trans
 n_samples = size(X_seq,1);

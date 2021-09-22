@@ -7,6 +7,9 @@ function plotTestAccuracy(Z_hat,trans, nu)
 % Define the number of states and samples
 n_states = size(Z_hat,1);
 n_samples = size(Z_hat,2);
+if length(nu) > 1
+    n_sensors = size(Z_hat,1) / 2;
+end
 
 figure
 y_lim = [-0.25 1.25];
@@ -37,9 +40,18 @@ for i = [1:n_states]
                 'FaceColor',[1 0 0 0.3])
         end
     end
+
     
     plot([1:n_samples], Z_hat(i,:),'b') % Test statistic plot
-    xline(nu,'g-') % System changepoint identifier
+    
+    % Loop around the changepoint vector and plot each
+    for j = [1:length(nu)]
+        if nu(j) < 0
+            xline(abs(nu(j)),'g-') % System changepoint identifier
+        else
+            xline(abs(nu(j)),'r-') % System changepoint identifier
+        end
+    end
 
     set(gca, 'color', [0 0.07 0.1 0.2])
     title(['Test Statistic $$Z_k^' num2str(i) '$$ vs. Samples k'],'Interpreter','Latex')

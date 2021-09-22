@@ -35,7 +35,16 @@ for i = [1:n_sensors]
     end
     
     plot([1:n_samples], y(i,:),'b') % Observation vector plot
-    xline(nu,'g-') % System changepoint identifier
+    
+    % Loop around the changepoint vector and plot each
+    for j = [1:length(nu)]
+        if nu(j) < 0
+            xline(abs(nu(j)),'g-') % System changepoint identifier
+        else
+            xline(abs(nu(j)),'r-') % System changepoint identifier
+        end
+    end
+    
     yline(mean_unaffected(i),'y--') % Expected mean value
     hold off
 
