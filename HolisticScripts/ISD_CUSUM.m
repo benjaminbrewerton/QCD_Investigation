@@ -53,7 +53,7 @@ clearvars trans
 
 % Rho is the probability that an object will transition between state
 % spaces.
-rho = 1e-3;
+rho = 2.5e-3;
 
 % The probability that the network will tranisition from state alpha to
 % beta
@@ -81,7 +81,7 @@ X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_states-1)]);
 
 % Determine the points at which the HMM transitions between state spaces
 lambda = zeros(1,n_samples);
-lambda(X >= n_states_nu + 1) = 1; % Post-change
+lambda(X > n_states_mu) = 1; % Post-change
 lambda(X <= n_states_mu) = 0; % Pre-change
 
 % Get the differences in the changepoint vector to determine where these
@@ -195,7 +195,8 @@ for i = [2:n_samples]
         end
 
         % Populate with the affected distribution
-        B(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
+        B(:,j) = (1./sqrt(2*pi*cur_vars)).' .* ...
+            exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
     end
     
     % Calculate the B matrix which is the diagonal of the PDF values at
@@ -220,8 +221,7 @@ clearvars Z_prev Z_new Z_ins B_cur
 
 %% Plot the test statistic results
 
-%plotTestStatistics(Z_hat, trans);
-
+plotTestStatistics(Z_hat, trans);
 
 %% Alternate Z_k plot
 
@@ -237,28 +237,6 @@ M_hat = zeros(2, n_samples);
 M_hat(1,:) = Z_hat(1,:);
 M_hat(2,:) = 1 - Z_hat(1,:);
 
-%% Cost Function Stopping Time
-
-% Define the penalty each time step
-c = 0.001;
-
-% Start by evaluating the summation term for each time step (tau)
-% The stopping time must be bounded by n_samples as there is no possibility
-% the stopping time can exceed n_samples
-J = zeros(1,n_samples);
-
-% Calculate the cost function at each stopping time by looping aruond the
-% maximum possible stopping time values 1:n_samples
-for i = [1:n_samples]
-    J(i) = c*sum(M_hat(2,1:i)) + M_hat(1,i);
-end
-
-% Determine the expected value at each tau step
-%J = J .* [1:n_samples];
-
-% Determine the value at which J is minimised
-[~,tau_J] = min(J);
-
 %% Infimum Bound Stopping Time
 
 % Define a probability threshold to test for
@@ -268,27 +246,59 @@ h = 0.99;
 k_h = [1:n_samples];
 
 % Get the mode statistic for when the system is in post-change
-M_h = M_hat(2,:);
-% Index the set such that it contains entries of M^2 > h
-k_h = k_h(M_h > h);
+M_mu = M_hat(1,:);
+M_nu = M_hat(2,:);
 
-% Determine the lower bound of the M_h set to determine the first location
-% of when the test statistic exceeds the probability threshold
-tau = min(k_h);
+% Initialise a vector which stores the threshold crossing indices. Store as
+% -1 if no changepoint is detected within the common boundary.
+tau = ones(1,length(lambda_i)) .* -1;
+
+% Loop around the changepoints and determine the index of the first sample
+% which exceeds the specified thresholds
+for i = [1:length(lambda_i)]
+   % Get the current changepoint start index
+   lambda_cur = lambda_i(i);
+   
+   % Get the next changepoint index
+   if i ~= length(lambda_i)
+       lambda_next = lambda_i(i + 1);
+   else
+       lambda_next = n_samples;
+   end
+   
+   % Begin iterating around each sample, looking for the point of threshold
+   % crossing
+   if lambda_cur > 0 % Pre-change to post-change case
+       M_stat = M_nu;
+   else % Post-change to pre-change
+       M_stat = M_mu;
+   end
+   
+    j = abs(lambda_cur);
+    while j < abs(lambda_next) && M_stat(j) <= h
+        j = j + 1; % Increment search index
+    end
+    
+    % Input the changepoint determined into the primary set
+    if j ~= abs(lambda_next)
+        tau(i) = j;
+    end
+end
 
 % Cleanup
-clearvars k_h M_h
+clearvars M_stat
 
 %% Plot the stopping results
-plotStoppingResults(n_samples,nu,tau,M_hat(2,:),h);
+
+plotStoppingResults(lambda_i, tau, M_hat, h);
 
 %% Calculate performance parameters
 
 % Average Detection Delay
-ADD = max(0,tau - nu);
+ADD = mean(abs(abs(lambda_i) - tau));
 
 % Probability of False Alarm
-PFA = 1 - M_hat(2,tau);
+%PFA = 1 - M_hat(2,tau);
 
 %% Cleanup
 clearvars i j
