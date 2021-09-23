@@ -47,18 +47,33 @@ pi_nu = ones(1,n_states_nu) ./ n_states_nu;
 % Cleanup
 clearvars trans
 
-%% Bayesian Probability Space Assumptions
+%% Generate the state randoms and changepoint
 
-% These variables are used for Bayesian changepoint modelling.
+% Check whether the changepoint is already supplied
+if ~exist('nu', 'var')
+    % Generate a random changepoint between 0 and n_samples / 2
+    nu = randi([1 n_samples]);
+end
 
-% Rho is the probability that an object will transition between state
-% spaces.
-rho = 2.5e-3;
+% Check if nu is invalid
+while nu >= n_samples
+    disp("Regenerating changepoint of deterministic scenario")
+    nu = randi([1 n_samples]);
+end
 
-% The probability that the network will tranisition from state alpha to
-% beta
-A_mu = rho .* pi_mu;
-A_nu = rho .* pi_nu;
+% Define changepoint as the number of samples
+%nu = n_samples;
+
+% Initialise the state sequence with ones until the changepoint to indicate
+% the system is in the pre-change state
+X = ones(1, n_samples);
+
+if nu < n_samples
+    % Simulate the rest of the markov chain in the post-change state space
+    % using the post-change transition matrices
+    X(nu:end) = simulate(A_beta, n_samples - nu) + 1;
+end
+
 
 %% Generate the state randoms and changepoint
 
