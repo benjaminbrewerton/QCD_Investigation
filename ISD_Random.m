@@ -1,9 +1,9 @@
-%% Environment Clearing
-clc
-close all
-clearvars
-
-addpath('..');
+function [ADD,PFA,tau,M_hat] = ISD_Random(mean_mu,var_mu, ...
+    mean_nu,var_nu, y, lambda, h)
+% Produces the Average Delay Detection and Probability of False Alarm from
+% a set of inputted means and variances (unaffected and affected
+% respectively in order) for an ISD scenario. 
+% This function assumes a setup of 3 sensors in the network.
 
 %% Begin definition of network variables
 
@@ -15,6 +15,9 @@ n_states_nu = 3;
 
 % Total number of states
 n_states = n_states_mu + n_states_nu;
+
+% Number of sensors
+n_sensors = max(n_states_mu, n_states_nu);
 
 % Number of random samples
 n_samples = 1e4;
@@ -65,97 +68,6 @@ A_nu = rho .* pi_nu;
 % Define the A from literature
 A_lit = [(1-rho).*A_alpha.P (1/n_states_nu).*repelem(A_mu,n_states_mu,n_states_nu) ; ...
     repelem(A_nu.',n_states_mu,1) (1-rho .* (1/n_states_nu)).*A_beta.P];
-
-% Determine the large A matrix which governs 
-A = dtmc(A_lit.');
-
-% Display the transition probabilities of the overall system
-figure
-graphplot(A,'ColorEdges',true)
-title('Holistic System Transition Probabilities')
-
-% Simulate the augmented HMM established in matrix A.
-% Start from node 1 in the pre-change space to simulate a sensor network
-% that has not yet detected a target.
-X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_states-1)]);
-
-% Determine the points at which the HMM transitions between state spaces
-lambda = zeros(1,n_samples);
-lambda(X > n_states_mu) = 1; % Post-change
-lambda(X <= n_states_mu) = 0; % Pre-change
-
-% Get the differences in the changepoint vector to determine where these
-% peaks occur. Append a 0 to the front of the vector to indicate the
-% changepoint is detected on the sample of occurrence instead of before.
-% Store as 1 (moving from mu to nu) and -1 (moving from nu to mu).
-lambda = [0 diff(lambda)];
-
-% Get the state indices of changepoints
-lambda = [1:n_samples] .* lambda;
-% Remove all zero indices
-lambda(lambda == 0) = [];
-
-
-% Print the generated changepoints
-disp("Generated scenario with changepoints at: ")
-for i = [1:length(lambda)]
-   if i ~= length(lambda)
-        disp([char(9) num2str(abs(lambda(i))) ',']);
-   else
-        disp([char(9) num2str(abs(lambda(i))) '.']);
-   end
-end
-%% Determine the transition points for plotting
-
-% Fetch the transition points from the state sequence X
-trans = getTransitionIndices(X);
-
-%% Define the Distribution Parameters
-
-% Assume the sensors observation measurements are i.i.d.
-
-% Each sensor's default distribution without being affected by a target
-% will be a standard normal distribution with sigma = 1 and mean = 0
-mean_mu = [1,2,3]; %= [1 2 3];
-var_mu = [1 1 1];
-
-% Each distribution parameter can be accessed with the node's index
-%variances = dist_dev + 0.5*rand(1,n_states);
-mean_nu = [2,3,4];%= [2 3 4];
-var_nu = [1 1 1];
-
-%% Generate randomly distributed values for each sensing node
-
-% Here we assume the number of sensors is equal in the pre-change and
-% post-change scenarios
-n_sensors = max(n_states_mu,n_states_nu);
-
-% Generate randomised observation data derived from the normal
-% distributions for each sensor node. Store the data as a matrix with each
-% row being a sensor's observation data and the column's being the samples
-y = zeros(n_sensors, n_samples);
-
-% Populate the y matrix with samples taken from a Gaussian distribution
-% with mean and variances per state as defined in means and vars
-for i = [1:n_samples]
-    % Check whether we are in pre-change or post-change states
-    if(X(i) <= n_states_mu)
-        % Generate an unaffected distribution sample
-        y(:,i) = sqrt(var_mu).' .* randn(n_sensors,1) + ...
-            mean_mu.';
-    else
-        % Define the var and mean to generate data with at this sample time
-        means = mean_mu; means(X(i)-1) = mean_nu(X(i)-1);
-        vars = var_mu; vars(X(i)-1) = var_nu(X(i)-1);
-
-        % Generate the data using a scaled randn value
-        y(:,i) = sqrt(vars).' .* randn(n_sensors,1) + means.';
-    end
-end
-
-%% Plot the observation data
-
-plotObservationData(n_sensors, trans, y, lambda, mean_mu)
 
 %% Hidden Markov Model Filter
 
@@ -219,14 +131,6 @@ end
 % Cleanup
 clearvars Z_prev Z_new Z_ins B_cur
 
-%% Plot the test statistic results
-
-plotTestStatistics(Z_hat, trans);
-
-%% Alternate Z_k plot
-
-plotTestAccuracy(Z_hat, trans, lambda);
-
 %% Define the Mode Process Vector
 
 % Initialise an empty 2 x n_samples matrix to store the mode process
@@ -239,12 +143,6 @@ M_hat(2,:) = 1 - Z_hat(1,:);
 
 %% Infimum Bound Stopping Time
 
-% Define a probability threshold to test for
-h = 0.99;
-
-% Form a set of k values
-k_h = [1:n_samples];
-
 % Get the mode statistic for when the system is in post-change
 M_mu = M_hat(1,:);
 M_nu = M_hat(2,:);
@@ -255,42 +153,40 @@ tau = ones(1,length(lambda)) .* -1;
 
 % Loop around the changepoints and determine the index of the first sample
 % which exceeds the specified thresholds
-for i = [1:length(lambda)]
-   % Get the current changepoint start index
-   lambda_cur = lambda(i);
-   
-   % Get the next changepoint index
-   if i ~= length(lambda)
-       lambda_next = lambda(i + 1);
-   else
-       lambda_next = n_samples;
-   end
-   
-   % Begin iterating around each sample, looking for the point of threshold
-   % crossing
-   if lambda_cur > 0 % Pre-change to post-change case
-       M_stat = M_nu;
-   else % Post-change to pre-change
-       M_stat = M_mu;
-   end
-   
-    j = abs(lambda_cur);
-    while j < abs(lambda_next) && M_stat(j) <= h
-        j = j + 1; % Increment search index
-    end
-    
-    % Input the changepoint determined into the primary set
-    if j ~= abs(lambda_next)
-        tau(i) = j;
+if exist('lambda','var')
+    for i = [1:length(lambda)]
+       % Get the current changepoint start index
+       lambda_cur = lambda(i);
+
+       % Get the next changepoint index
+       if i ~= length(lambda)
+           lambda_next = lambda(i + 1);
+       else
+           lambda_next = n_samples;
+       end
+
+       % Begin iterating around each sample, looking for the point of threshold
+       % crossing
+       if lambda_cur > 0 % Pre-change to post-change case
+           M_stat = M_nu;
+       else % Post-change to pre-change
+           M_stat = M_mu;
+       end
+
+        j = abs(lambda_cur);
+        while j < abs(lambda_next) && M_stat(j) <= h
+            j = j + 1; % Increment search index
+        end
+
+        % Input the changepoint determined into the primary set
+        if j ~= abs(lambda_next)
+            tau(i) = j;
+        end
     end
 end
 
 % Cleanup
 clearvars M_stat
-
-%% Plot the stopping results
-
-plotStoppingResults(lambda, tau, M_hat, h);
 
 %% Calculate performance parameters
 
@@ -298,7 +194,6 @@ plotStoppingResults(lambda, tau, M_hat, h);
 ADD = mean(abs(abs(lambda) - tau));
 
 % Probability of False Alarm
-%PFA = 1 - M_hat(2,tau);
+PFA = 0;
 
-%% Cleanup
-clearvars i j
+end

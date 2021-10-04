@@ -236,26 +236,7 @@ clearvars k_h
 
 %% Plot the stopping results
 
-figure
-hold on
-
-plot([1:n_samples],S) % Plot likelihood of system in post-change
-plot(nu,S(nu),'go') % Plot the change-point
-plot(tau,S(tau),'ro') % Plot the stopping time
-yline(h,'m--') % Plot the detection threshold
-
-set(gca, 'color', [0 0.07 0.1 0.2])
-set(gca, 'YScale', 'log')
-title('CUSUM Test Statistic $$\tilde{Z}_k$$ vs. Samples k','Interpreter','Latex')
-xlabel('Sample k','Interpreter','Latex')
-ylabel('$$\tilde{Z}_k$$','Interpreter','Latex')
-leg = legend('$$\tilde{Z}_k$$ -- CUSUM Statistic',...
-    '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
-    '$$h_C$$ -- Threshold');
-leg.Interpreter = 'Latex';
-leg.Color = 'w';
-xlim([0 n_samples])
-ylim([0 5000])
+plotCUSUMResults(S, h, nu, tau);
 
 %% Calculate performance parameters
 

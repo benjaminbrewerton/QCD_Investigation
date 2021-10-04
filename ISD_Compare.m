@@ -49,7 +49,7 @@ for i = [1:n_trials]
 end
 
 %% Begin iterating around each SNR and running a number of trials
-n_scenarios = 100;
+n_scenarios = 150;
 
 % Store the results in matrices
 results_CUSUM_B = zeros(n_trials,3); % [ADD, MTFA, Tau]
@@ -70,60 +70,60 @@ for i = [1:n_trials]
         %% Generate the Bayesian scenario
 
         % State sequence, observations and changepoint
-        [X_B, y_B, nu_B] = simulate_random_scenario(mean_unaffected,var_unaffected, ...
-            means(i,:),var_affected);
+        [X_B, y_B, nu_B] = simulate_ISD_scenario(mean_unaffected,var_unaffected, ...
+            means(i,:),var_affected, -1);
 
         %% Fetch the algorithm's test statistics
 
-        % ==== BAYESIAN ====
+        % ==== RANDOM ====
         % CUSUM
         % Set threshold:
         h_cusum = 14.191;
-        [ADD,MTFA,tau,~] = CUSUMScenario(mean_unaffected, ...
+        [ADD,MTFA,tau,~] = ISD_Deterministic(mean_unaffected, ...
             var_unaffected, means(i,:), var_affected, y_B, nu_B, h_cusum);
          
         % Append results to SNR trial increment
         ADD_CUSUM_B = ADD_CUSUM_B + ADD;
         MTFA_CUSUM_B = MTFA_CUSUM_B + MTFA;
-        tau_CUSUM_B = tau_CUSUM_B + tau;
+        %tau_CUSUM_B = tau_CUSUM_B + tau;
         
         % HMM Filter
         % Set threshold:
-        h_bay = 0.9995;
-        [ADD,PFA,tau,~] = BayesianScenario(mean_unaffected, ...
+        h_bay = 0.999456426692078;
+        [ADD,PFA,tau,~] = ISD_Random(mean_unaffected, ...
             var_unaffected, means(i,:), var_affected, y_B, nu_B, h_bay);
         
         % Append results to SNR trial increment
         ADD_FILTER_B = ADD_FILTER_B + ADD;
         PFA_FILTER_B = PFA_FILTER_B + PFA;
-        tau_FILTER_B = tau_FILTER_B + tau;
+        %tau_FILTER_B = tau_FILTER_B + tau;
 
         %% GENERATED A DETERMINISTIC CHANGEPOINT SCENARIO
 
         % State sequence, observations and changepoint
-        [X_D, y_D, nu_D] = simulate_deterministic_scenario(mean_unaffected,var_unaffected, ...
-            means(i,:),var_affected);
+        [X_D, y_D, nu_D] = simulate_ISD_scenario(mean_unaffected,var_unaffected, ...
+            means(i,:),var_affected, 10);
 
         %% Fetch the deterministic algorithm's performance
         % ==== DETERMINISTIC ====
         % Assumes a rho of 1e-4
         % CUSUM
-        [ADD,MTFA,tau,~] = CUSUMScenario(mean_unaffected, ...
+        [ADD,MTFA,tau,~] = ISD_Deterministic(mean_unaffected, ...
             var_unaffected, means(i,:), var_affected, y_D, nu_D, h_cusum);
         
         % Append results to SNR trial increment
         ADD_CUSUM_D = ADD_CUSUM_D + ADD;
         MTFA_CUSUM_D = MTFA_CUSUM_D + MTFA;
-        tau_CUSUM_D = tau_CUSUM_D + tau;
+        %tau_CUSUM_D = tau_CUSUM_D + tau;
         
         % HMM Filter
-        [ADD,PFA,tau,~] = BayesianScenario(mean_unaffected, ...
+        [ADD,PFA,tau,~] = ISD_Random(mean_unaffected, ...
             var_unaffected, means(i,:), var_affected, y_D, nu_D, h_bay);
         
         % Append results to SNR trial increment
         ADD_FILTER_D = ADD_FILTER_D + ADD;
         PFA_FILTER_D = PFA_FILTER_D + PFA;
-        tau_FILTER_D = tau_FILTER_D + tau;
+        %tau_FILTER_D = tau_FILTER_D + tau;
         
         % Update the progress bar
         waitbar(((i*n_scenarios) + j)/(n_trials*n_scenarios));
