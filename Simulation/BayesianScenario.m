@@ -141,6 +141,11 @@ M_hat(2,:) = 1 - Z_hat(1,:);
 
 %% Infimum Bound Stopping Time
 
+% Check if threshold exists
+if ~exist('h','var')
+    h = 0.99;
+end
+
 % Form a set of k values
 k_h = [1:n_samples];
 

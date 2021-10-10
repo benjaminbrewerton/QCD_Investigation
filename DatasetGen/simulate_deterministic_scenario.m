@@ -56,9 +56,11 @@ end
 % the system is in the pre-change state
 X = ones(1, n_samples);
 
-% Simulate the rest of the markov chain in the post-change state space
-% using the post-change transition matrices
-X(nu:end) = simulate(A_beta, n_samples - nu) + 1;
+if nu ~= 0
+    % Simulate the rest of the markov chain in the post-change state space
+    % using the post-change transition matrices
+    X(nu:end) = simulate(A_beta, n_samples - nu) + 1;
+end
 
 %% Generate randomly distributed values for each sensing node
 
@@ -71,7 +73,7 @@ y = zeros(n_sensors,n_samples);
 % with mean and variances per state as defined in means and vars
 for i = [1:n_samples]
     % Check whether we are in pre or post-change
-    if(i < nu)
+    if(i < nu || nu == 0)
         % Generate an unaffected distribution sample
         y(:,i) = sqrt(var_unaffected).' .* randn(n_sensors,1) + ...
             mean_unaffected.';

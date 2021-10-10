@@ -8,6 +8,10 @@ clc
 do_random_mean = 0;
 random_mean_modifier = [ 1 1 1 ];
 
+% Add the paths requried to run
+addpath('DatasetGen')
+addpath('Simulation')
+
 %% Define the means and variance parameters
 
 % Assume the sensors observation measurements are i.i.d.
@@ -49,22 +53,29 @@ for i = [1:n_trials]
 end
 
 %% Begin iterating around each SNR and running a number of trials
-n_scenarios = 100;
+n_scenarios = 500;
 
 % Store the results in matrices
 results_CUSUM_B = zeros(n_trials,3); % [ADD, MTFA, Tau]
 results_CUSUM_D = zeros(n_trials,3); % [ADD, MTFA, Tau]
 results_FILTER_B = zeros(n_trials,3); % [ADD, PFA, Tau]
 results_FILTER_D = zeros(n_trials,3); % [ADD, PFA, Tau]
+results_MC = zeros(n_trials,4); % [CUSUM_B, FILTER_B, CUSUM_D, FILTER_D]
 
 % Make a progress bar to see the simulation progress
 u = waitbar(0, 'Simulation Progress');
+
+% Thresholds
+h_B = [0.999769140523478,0.999969578001201,0.999795850507762,0.999816372444712,0.999644934675811,0.999867795754736,0.999001136230981,0.999263866186132,0.999897176211415,0.999166297478432,0.998416738053169];
+h_C = [13.0044624250654,13.5233154436896,13.2375955343193,13.2065419692670,13.6886603565447,15.1927294870466,13.6174437354134,13.9509832102166,16.9185020257958,17.5272155064804,15.5988191752556];
+
 
 for i = [1:n_trials]
    ADD_CUSUM_B = 0; MTFA_CUSUM_B = 0; tau_CUSUM_B = 0;
    ADD_CUSUM_D = 0; MTFA_CUSUM_D = 0; tau_CUSUM_D = 0;
    ADD_FILTER_B = 0; PFA_FILTER_B = 0; tau_FILTER_B = 0;
    ADD_FILTER_D = 0; PFA_FILTER_D = 0; tau_FILTER_D = 0;
+   MC_B_CUSUM = 0; MC_D_CUSUM = 0; MC_B_FILTER = 0; MC_D_FILTER = 0;
    for j = [1:n_scenarios]
         %% RUN A BAYESIAN SCENARIO FIRST WITH A RANDOMLY GENERATED CHANGEPOINT
         %% Generate the Bayesian scenario
@@ -78,55 +89,69 @@ for i = [1:n_trials]
         % ==== BAYESIAN ====
         % CUSUM
         % Set threshold:
-        h_cusum = 14.191;
         [ADD,MTFA,tau,~] = CUSUMScenario(mean_unaffected, ...
-            var_unaffected, means(i,:), var_affected, y_B, nu_B, h_cusum);
+            var_unaffected, means(i,:), var_affected, y_B, nu_B, h_C(i));
          
         % Append results to SNR trial increment
-        ADD_CUSUM_B = ADD_CUSUM_B + ADD;
-        MTFA_CUSUM_B = MTFA_CUSUM_B + MTFA;
-        tau_CUSUM_B = tau_CUSUM_B + tau;
+        if ADD == -1 || MTFA == -1 || tau == -1
+            MC_B_CUSUM = MC_B_CUSUM + 1;
+        else
+            ADD_CUSUM_B = ADD_CUSUM_B + ADD;
+            MTFA_CUSUM_B = MTFA_CUSUM_B + MTFA;
+            tau_CUSUM_B = tau_CUSUM_B + tau;
+        end
         
         % HMM Filter
         % Set threshold:
-        h_bay = 0.9995;
         [ADD,PFA,tau,~] = BayesianScenario(mean_unaffected, ...
-            var_unaffected, means(i,:), var_affected, y_B, nu_B, h_bay);
+            var_unaffected, means(i,:), var_affected, y_B, nu_B, h_B(i));
         
         % Append results to SNR trial increment
-        ADD_FILTER_B = ADD_FILTER_B + ADD;
-        PFA_FILTER_B = PFA_FILTER_B + PFA;
-        tau_FILTER_B = tau_FILTER_B + tau;
+        if ADD == -1 || PFA == -1 || tau == -1
+            MC_B_FILTER = MC_B_FILTER + 1;
+        else
+            ADD_FILTER_B = ADD_FILTER_B + ADD;
+            PFA_FILTER_B = PFA_FILTER_B + PFA;
+            tau_FILTER_B = tau_FILTER_B + tau;
+        end
 
         %% GENERATED A DETERMINISTIC CHANGEPOINT SCENARIO
 
         % State sequence, observations and changepoint
         [X_D, y_D, nu_D] = simulate_deterministic_scenario(mean_unaffected,var_unaffected, ...
-            means(i,:),var_affected);
+            means(i,:),var_affected, 1000);
 
         %% Fetch the deterministic algorithm's performance
         % ==== DETERMINISTIC ====
-        % Assumes a rho of 1e-4
+
         % CUSUM
         [ADD,MTFA,tau,~] = CUSUMScenario(mean_unaffected, ...
-            var_unaffected, means(i,:), var_affected, y_D, nu_D, h_cusum);
+            var_unaffected, means(i,:), var_affected, y_D, nu_D, h_C(i));
         
         % Append results to SNR trial increment
-        ADD_CUSUM_D = ADD_CUSUM_D + ADD;
-        MTFA_CUSUM_D = MTFA_CUSUM_D + MTFA;
-        tau_CUSUM_D = tau_CUSUM_D + tau;
+        if ADD == -1 || MTFA == -1 || tau == -1
+            MC_D_CUSUM = MC_D_CUSUM + 1;
+        else
+            ADD_CUSUM_D = ADD_CUSUM_D + ADD;
+            MTFA_CUSUM_D = MTFA_CUSUM_D + MTFA;
+            tau_CUSUM_D = tau_CUSUM_D + tau;  
+        end
         
         % HMM Filter
         [ADD,PFA,tau,~] = BayesianScenario(mean_unaffected, ...
-            var_unaffected, means(i,:), var_affected, y_D, nu_D, h_bay);
+            var_unaffected, means(i,:), var_affected, y_D, nu_D, h_B(i));
         
         % Append results to SNR trial increment
-        ADD_FILTER_D = ADD_FILTER_D + ADD;
-        PFA_FILTER_D = PFA_FILTER_D + PFA;
-        tau_FILTER_D = tau_FILTER_D + tau;
+        if ADD == -1 || PFA == -1 || tau == -1
+            MC_D_FILTER = MC_D_FILTER + 1;
+        else
+            ADD_FILTER_D = ADD_FILTER_D + ADD;
+            PFA_FILTER_D = PFA_FILTER_D + PFA;
+            tau_FILTER_D = tau_FILTER_D + tau; 
+        end
         
         % Update the progress bar
-        waitbar(((i*n_scenarios) + j)/(n_trials*n_scenarios));
+        waitbar((((i-1)*n_scenarios) + j)/(n_trials*n_scenarios));
    end
    
    % Take the means and insert into the main results matrix
@@ -134,7 +159,10 @@ for i = [1:n_trials]
    results_CUSUM_D(i,:) = [ADD_CUSUM_D MTFA_CUSUM_D tau_CUSUM_D] ./ n_scenarios;
    results_FILTER_B(i,:) = [ADD_FILTER_B PFA_FILTER_B tau_FILTER_B] ./ n_scenarios;
    results_FILTER_D(i,:) = [ADD_FILTER_D PFA_FILTER_D tau_FILTER_D] ./ n_scenarios;
+   results_MC(i,:) = results_MC(i,:) + [MC_B_CUSUM MC_D_CUSUM MC_B_FILTER MC_D_FILTER];
 end
+
+close(u)
 
 % cleanup
 clearvars ADD MTFA tau S M_hat PFA
@@ -151,9 +179,11 @@ colororder({'b','r'})
 yyaxis left
 plot(SNR, results_FILTER_B(:,1),'b*') % ADD
 ylabel('HMM Filter Delay','Interpreter','Latex')
+ylim([0 1.05 * max([results_FILTER_B(:,1) results_CUSUM_B(:,1)],[],'ALL')])
 yyaxis right
-plot(SNR, results_CUSUM_B(:,1),'r.') % PFA
+plot(SNR, results_CUSUM_B(:,1),'r.','MarkerSize',12) % PFA
 ylabel('CUSUM Delay','Interpreter','Latex')
+ylim([0 1.05 * max([results_FILTER_B(:,1) results_CUSUM_B(:,1)],[],'ALL')])
 title('\textbf{Random}', ...
     'Interpreter', 'Latex')
 xlabel('SNR (dB)')
@@ -165,9 +195,11 @@ colororder({'b','r'})
 yyaxis left
 plot(SNR, results_FILTER_D(:,1),'b*') % ADD
 ylabel('HMM Filter Delay','Interpreter','Latex')
+ylim([0 1.05 * max([results_FILTER_D(:,1) results_CUSUM_D(:,1)],[],'ALL')])
 yyaxis right
-plot(SNR, results_CUSUM_D(:,1),'r.') % PFA
+plot(SNR, results_CUSUM_D(:,1),'r.','MarkerSize',12) % PFA
 ylabel('CUSUM Delay','Interpreter','Latex')
+ylim([0 1.05 * max([results_FILTER_D(:,1) results_CUSUM_D(:,1)],[],'ALL')])
 title('\textbf{Deterministic}', ...
     'Interpreter', 'Latex')
 xlabel('SNR (dB)')

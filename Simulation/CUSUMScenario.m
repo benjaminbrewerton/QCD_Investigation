@@ -45,28 +45,6 @@ A_beta = dtmc(trans_beta);
 % tranisition to the states in space beta is equal
 pi_k = ones(1,n_sensors) ./ n_sensors;
 
-%% Define the probabilities of specific events
-
-% There is no pre-change state dependence, such that rho is constant for
-% all states in the state spaces
-
-% Rho is the probability that an object will enter the network
-rho = 4e-4;
-
-% The probability that the network will tranisition from state alpha to
-% beta
-A_nu = rho * pi_k;
-
-%% Generate the state randoms and changepoint
-
-% Since before the changepoint, the state variables in space alpha are not
-% relevant to the problem and do not have to be simulated.
-
-% Calculate A to determine the state variables X
-% Use the definition where rho is constant for all states
-A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
-    'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
-
 %% Hidden Markov Model Filter
 
 % To estimate the current state of the HMM from the observation densities,
@@ -78,9 +56,6 @@ Z_hat(:,1) = pi_k.';
 % Initialise an array S, which contains the CUSUM test statistic
 S = zeros(1,n_samples);
 
-% Transpose the A matrix to align with literature definition
-AT = A.P.';
- 
 for i = [2:n_samples]
     % Get the observation vector for a time sample k
     cur_obs = y(:,i);
@@ -131,6 +106,11 @@ for i = [2:n_samples]
 end
 
 %% Infimum Bound Stopping Time
+
+% Check if threshold exists
+if ~exist('h','var')
+    h = 0.99;
+end
 
 % Form a set of k values
 k_h = [1:n_samples];

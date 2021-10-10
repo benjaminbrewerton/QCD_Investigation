@@ -1,5 +1,5 @@
 function [X, y, nu] = simulate_random_scenario(mean_unaffected,var_unaffected, ...
-    mean_affected,var_affected)
+    mean_affected,var_affected,nu)
 
 %% Begin definition of network variables
 
@@ -66,12 +66,9 @@ A_nu = rho * pi_k;
 A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
     'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
 
-% Dummy changepoint
-nu = n_samples + 1;
+% Check for a deterministic changepoint setting
+if ~exist('nu','var')
 
-% Check if the changepoint never occurs
-while nu >= n_samples
-    
 % Simulate the entire scenarios markov chain state transitions
 % Assume that the when the space transitions from alpha to beta that the
 % simulation begins at a random state with equal probability of initial
@@ -83,16 +80,25 @@ X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
 % DTMC alpha and into DTMC beta
 nu = length(X(X == 1)) + 1; % + 1 for being inclusive of the transition sample
 
-if nu >= n_samples
+while nu >= n_samples
     disp(["Changepoint was never reached after " num2str(n_samples) ...
        " samples. Trying again."]);
-else
-    % Print the result
-    disp(['It took ' num2str(nu) ...
-    ' iterations to transition to the post-change state']);
-end
+    % Initialise the sequence to begin at node 1
+    X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
+    nu = length(X(X == 1)) + 1; % + 1 for being inclusive of the transition sample
 end
 
+else % Deterministic case
+    % Initialise the state sequence with ones until the changepoint to indicate
+    % the system is in the pre-change state
+    X = ones(1, n_samples);
+
+    if nu ~= 0
+        % Simulate the rest of the markov chain in the post-change state space
+        % using the post-change transition matrices
+        X(nu:end) = simulate(A_beta, n_samples - nu) + 1;
+    end
+end
 %% Generate randomly distributed values for each sensing node
 
 % Generate randomised observation data derived from the normal
@@ -104,7 +110,7 @@ y = zeros(n_sensors,n_samples);
 % with mean and variances per state as defined in means and vars
 for i = [1:n_samples]
     % Check whether we are in pre or post-change
-    if(i < nu)
+    if(i < nu || nu == 0)
         % Generate an unaffected distribution sample
         y(:,i) = sqrt(var_unaffected).' .* randn(n_sensors,1) + ...
             mean_unaffected.';
