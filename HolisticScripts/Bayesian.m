@@ -3,6 +3,9 @@ clc
 close all
 clearvars
 
+% Add the paths
+addpath('Helper');
+
 %% Begin definition of network variables
 
 % Number of pre-change states
@@ -210,11 +213,11 @@ for i = [2:n_samples]
     % Calculate the new estimate
     Z_new = B * AT * Z_prev; % Big A matrix
 
-    % Normalise the new estimate
-    Z_ins = inv(sum(Z_new)) * Z_new;
+    % Calculate the normalistation factor
+    N = 1 / sum(Z_new);
 
     % Input the new estimate into the main Z test matrix
-    Z_hat(:,i) = Z_ins;
+    Z_hat(:,i) = N * Z_new;
 end
 
 % Cleanup
@@ -238,28 +241,6 @@ M_hat = zeros(2, n_samples);
 % Use indexing to calculate M_k = M(Z_k)
 M_hat(1,:) = Z_hat(1,:);
 M_hat(2,:) = 1 - Z_hat(1,:);
-
-%% Cost Function Stopping Time
-
-% Define the penalty each time step
-c = 0.001;
-
-% Start by evaluating the summation term for each time step (tau)
-% The stopping time must be bounded by n_samples as there is no possibility
-% the stopping time can exceed n_samples
-J = zeros(1,n_samples);
-
-% Calculate the cost function at each stopping time by looping aruond the
-% maximum possible stopping time values 1:n_samples
-for i = [1:n_samples]
-    J(i) = c*sum(M_hat(2,1:i)) + M_hat(1,i);
-end
-
-% Determine the expected value at each tau step
-%J = J .* [1:n_samples];
-
-% Determine the value at which J is minimised
-[~,tau_J] = min(J);
 
 %% Infimum Bound Stopping Time
 

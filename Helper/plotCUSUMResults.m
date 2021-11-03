@@ -13,7 +13,9 @@ tau_trim = tau >= 0;
 figure
 hold on
 
-plot([1:n_samples],S) % Plot likelihood of system in post-change
+for i = 1:size(S,2)
+    plot([1:n_samples],S(i,:)) % Plot likelihood of system in post-change
+end
 
 plot(nu_abs,S(nu_abs),'go') % Plot the change-point
 
@@ -32,9 +34,17 @@ end
 title('CUSUM Test Statistic $$\tilde{Z}_k$$ vs. Samples k','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$\tilde{Z}_k$$','Interpreter','Latex')
-leg = legend('$$\tilde{Z}_k$$ -- CUSUM Statistic',...
+
+if size(S,2) > 1
+    leg = legend('$$S_\nu$$ -- CUSUM Statistic',...
+    '$$S_\mu$$ -- CUSUM Statistic',...
     '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
     '$$h_C$$ -- Threshold');
+else
+    leg = legend('$$S_\nu$$ -- CUSUM Statistic',...
+    '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
+    '$$h_C$$ -- Threshold');
+end
 leg.Interpreter = 'Latex';
 leg.Color = 'w';
 xlim([0 n_samples])

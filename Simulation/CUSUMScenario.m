@@ -1,4 +1,4 @@
-function [ADD,PFA,tau,S] = CUSUMScenario(mean_unaffected,var_unaffected, ...
+function [ADD,MTFA,tau,S] = CUSUMScenario(mean_unaffected,var_unaffected, ...
     mean_affected,var_affected, y, nu, h)
 % Produces the Average Delay Detection and Probability of False Alarm from
 % a set of inputted means and variances (unaffected and affected
@@ -109,7 +109,7 @@ end
 
 % Check if threshold exists
 if ~exist('h','var')
-    h = 0.99;
+    h = 8;
 end
 
 % Form a set of k values
@@ -132,7 +132,7 @@ ADD = max(0,tau - nu);
 
 % Mean time to false alarm
 %PFA = 1 - M_hat(2,tau);
-PFA = 0;
+MTFA = n_samples;
 
 if isempty(tau)
     tau = -1;

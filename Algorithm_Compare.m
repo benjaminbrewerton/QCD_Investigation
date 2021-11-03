@@ -5,8 +5,10 @@ clear
 clc
 
 % SET ENVIRONMENT SETTINGS
-do_random_mean = 1;
+do_random_mean = 0;
 random_mean_modifier = [ 1 1 1 ];
+addpath('DatasetGen')
+addpath('Simulation')
 
 %% Define the means and variance parameters
 
@@ -49,16 +51,16 @@ disp(" ")
 
 %% Fetch the algorithm's test statistics
 
-% ==== BAYESIAN ====
+% ==== RANDOM ====
 % CUSUM
 % Set threshold:
-h_cusum = 8;
+h_cusum = 13.178396938960308;
 [ADD_CUSUM_B,MTFA_CUSUM_B,tau_CUSUM_B,S_B] = CUSUMScenario(mean_unaffected, ...
     var_unaffected, mean_affected, var_affected, y_B, nu_B, h_cusum);
 
 % HMM Filter
 % Set threshold:
-h_bay = 0.99;
+h_bay = 0.999701274462108;
 [ADD_HMM_B,PFA_HMM_B,tau_HMM_B,M_hat_B] = BayesianScenario(mean_unaffected, ...
     var_unaffected, mean_affected, var_affected, y_B, nu_B, h_bay);
 
@@ -66,16 +68,18 @@ h_bay = 0.99;
 
 % State sequence, observations and changepoint
 [X_D, y_D, nu_D] = simulate_deterministic_scenario(mean_unaffected,var_unaffected, ...
-    mean_affected,var_affected, nu_B);
+    mean_affected,var_affected, 5000);
 
 %% Fetch the deterministic algorithm's performance
 % ==== DETERMINISTIC ====
 
 % CUSUM
+h_cusum = 12.806962979038087;
 [ADD_CUSUM_D,MTFA_CUSUM_D,tau_CUSUM_D,S_D] = CUSUMScenario(mean_unaffected, ...
     var_unaffected, mean_affected, var_affected, y_D, nu_D, h_cusum);
 
 % HMM Filter
+h_bay = 0.999623011766654;
 [ADD_HMM_D,PFA_HMM_D,tau_HMM_D,M_hat_D] = BayesianScenario(mean_unaffected, ...
     var_unaffected, mean_affected, var_affected, y_D, nu_D, h_bay);
 %% Plot the findings
@@ -85,7 +89,7 @@ n_samples = length(X_B);
 
 figure
 
-% Bayesian Plots
+% Random Dataset Plots
 
 % CUSUM Plot
 subplot(1,2,1)
@@ -98,7 +102,7 @@ hold off
 
 set(gca, 'color', [0 0.07 0.1 0.2])
 set(gca, 'YScale', 'log')
-title('Random $$\nu$$ CUSUM Algorithm $$S_k$$','Interpreter','Latex')
+title('CUSUM','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$S_k$$','Interpreter','Latex')
 xlim([0 n_samples])
@@ -114,14 +118,16 @@ yline(h_bay,'m--') % Plot the detection threshold
 hold off
 
 set(gca, 'color', [0 0.07 0.1 0.2])
-title('Random $$\nu$$ HMM Filter Algorithm $$\hat{M}_k^2$$','Interpreter','Latex')
+title('HMM Filter','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$M_k^2$$','Interpreter','Latex')
 xlim([0 n_samples])
 ylim([-0.1 1.1])
 
+sgtitle('Random Dataset')
 
-% Deterministic Plots
+
+% Deterministic Dataset Plots
 
 figure
 % CUSUM plot
@@ -135,7 +141,7 @@ hold off
 
 set(gca, 'color', [0 0.07 0.1 0.2])
 set(gca, 'YScale', 'log')
-title('Determinstic $$\nu$$ CUSUM Algorithm $$S_k$$','Interpreter','Latex')
+title('CUSUM','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$S_k$$','Interpreter','Latex')
 xlim([0 n_samples])
@@ -151,11 +157,13 @@ yline(h_bay,'m--') % Plot the detection threshold
 hold off
 
 set(gca, 'color', [0 0.07 0.1 0.2])
-title('Deterministic $$\nu$$ HMM Filter Algorithm $$\hat{M}_k^2$$','Interpreter','Latex')
+title('HMM Filter','Interpreter','Latex')
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$M_k^2$$','Interpreter','Latex')
 xlim([0 n_samples])
 ylim([-0.1 1.1])
+
+sgtitle('Deterministic Dataset')
 
 %% Print results
 

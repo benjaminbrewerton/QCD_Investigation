@@ -169,7 +169,10 @@ Z_hat = zeros(n_sensors,n_samples);
 Z_hat(:,1) = pi_nu.';
  
 % Initialise an array S, which contains the CUSUM test statistic
-S = zeros(1,n_samples);
+S_nu = zeros(1,n_samples);
+% Initialise a second statistic which tracks when the system is in the
+% pre-change state
+S_mu = zeros(1,n_samples);
  
 for i = [2:n_samples]
     % Get the observation vector for a time sample k
@@ -217,7 +220,10 @@ for i = [2:n_samples]
     
     % Evaluate the test statistic using the CUSUM algorithm under Lorden's
     % criteria
-    S(i) = max(0, S(i-1) + log(1/N) - log(P_alpha));
+    S_nu(i) = max(0, S_nu(i-1) + log(1/N) - log(P_alpha));
+    S_mu(i) = max(0, S_mu(i-1) + log(P_alpha) - log(1/N));
+    
+    % Check whether to reset the opposite statistic
 end
 
 % Cleanup
@@ -260,12 +266,12 @@ for i = [1:length(lambda)]
    j = abs(lambda_cur);
    if lambda_cur > 0 % Pre-change to post-change case
     while j < abs(lambda_next) && ...
-            S(j) < S(abs(lambda_cur)) + h
+            S_nu(j) < S_nu(abs(lambda_cur)) + h
         j = j + 1; % Increment search index
     end
    else % Post-change to pre-change
     while j < abs(lambda_next) && ...
-            S(j) > S(abs(lambda_cur)) - h
+            S_nu(j) > S_nu(abs(lambda_cur)) - h
         j = j + 1; % Increment search index
     end
    end
@@ -281,7 +287,7 @@ clearvars M_stat
 
 %% Plot the stopping results
 
-plotCUSUMResults(S, [], lambda, tau);
+plotCUSUMResults([S_nu ; S_mu], [], lambda, tau);
 
 %% Calculate performance parameters
 

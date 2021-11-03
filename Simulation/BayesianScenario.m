@@ -109,7 +109,8 @@ for i = [2:n_samples]
         end
 
         % Populate with the affected distribution
-        B(:,j) = exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
+        B(:,j) = (1./sqrt(2*pi*cur_vars)).' .* ...
+            exp(-(cur_obs - cur_means.').^2 ./ (2*cur_vars.'));
     end
     
     % Calculate the B matrix which is the diagonal of the PDF values at
@@ -121,12 +122,12 @@ for i = [2:n_samples]
 
     % Calculate the new estimate
     Z_new = B * AT * Z_prev; % Big A matrix
-
-    % Normalise the new estimate
-    Z_ins = inv(sum(Z_new)) * Z_new;
+    
+    % Calculate the normalistation factor
+    N = 1 / sum(Z_new);
 
     % Input the new estimate into the main Z test matrix
-    Z_hat(:,i) = Z_ins;
+    Z_hat(:,i) = N * Z_new;
 end
 
 %% Define the Mode Process Vector

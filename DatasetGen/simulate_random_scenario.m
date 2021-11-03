@@ -81,8 +81,8 @@ X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
 nu = length(X(X == 1)) + 1; % + 1 for being inclusive of the transition sample
 
 while nu >= n_samples
-    disp(["Changepoint was never reached after " num2str(n_samples) ...
-       " samples. Trying again."]);
+    disp(['Changepoint was never reached after ' num2str(n_samples) ...
+       ' samples. Trying again.']);
     % Initialise the sequence to begin at node 1
     X = simulate(A, n_samples - 1,'X0',[1 zeros(1,n_sensors)]);
     nu = length(X(X == 1)) + 1; % + 1 for being inclusive of the transition sample

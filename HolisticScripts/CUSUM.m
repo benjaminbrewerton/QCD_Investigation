@@ -3,6 +3,10 @@ clc
 close all
 clearvars
 
+addpath('..\Helper');
+addpath('..\DatasetGen');
+addpath('..\Simulation');
+
 %% Begin definition of network variables
 
 % Number of pre-change states
