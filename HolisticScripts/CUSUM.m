@@ -3,9 +3,9 @@ clc
 close all
 clearvars
 
-addpath('..\Helper');
-addpath('..\DatasetGen');
-addpath('..\Simulation');
+addpath('Helper');
+addpath('DatasetGen');
+addpath('Simulation');
 
 %% Begin definition of network variables
 
@@ -77,26 +77,6 @@ if nu < n_samples
     X(nu:end) = simulate(A_beta, n_samples - nu) + 1;
 end
 
-%% Define the probabilities of specific events
-
-% There is no pre-change state dependence, such that rho is constant for
-% all states in the state spaces
-
-% Rho is the probability that an object will enter the network
-rho = 5e-4;
-
-% The probability that the network will tranisition from state alpha to
-% beta
-A_nu = rho * pi_k;
-
-% Since before the changepoint, the state variables in space alpha are not
-% relevant to the problem and do not have to be simulated.
-
-% Calculate A to determine the state variables X
-% Use the definition where rho is constant for all states
-A = dtmc([(1-rho)*A_alpha.P A_nu ; zeros(n_sensors,1) A_beta.P], ...
-    'StateNames',["Alpha 1" "Beta 1" "Beta 2" "Beta 3"]);
-
 %% Determine the transition points
 
 % Define a new matrix, e, which will hold a 1 in the row where the current
@@ -167,9 +147,6 @@ Z_hat(:,1) = pi_k.';
  
 % Initialise an array S, which contains the CUSUM test statistic
 S = zeros(1,n_samples);
- 
-% Transpose the A matrix to align with literature definition
-AT = A.P.';
  
 for i = [2:n_samples]
     % Get the observation vector for a time sample k

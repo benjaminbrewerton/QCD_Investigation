@@ -67,12 +67,12 @@ A_lit = [(1-rho).*A_alpha.P (1/n_states_nu).*repelem(A_mu,n_states_mu,n_states_n
     repelem(A_nu.',n_states_mu,1) (1-rho .* (1/n_states_nu)).*A_beta.P];
 
 % Determine the large A matrix which governs 
-A = dtmc(A_lit.');
+A = dtmc(A_lit.','StateNames',["Mu 1","Nu 1", "Nu 2", "Nu 3"]);
 
 % Display the transition probabilities of the overall system
 figure
 graphplot(A,'ColorEdges',true)
-title('Holistic System Transition Probabilities')
+title('Holistic ISD System Transition Probabilities')
 
 % Simulate the augmented HMM established in matrix A.
 % Start from node 1 in the pre-change space to simulate a sensor network
