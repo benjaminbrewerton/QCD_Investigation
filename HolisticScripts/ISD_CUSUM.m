@@ -3,7 +3,8 @@ clc
 close all
 clearvars
 
-addpath('..');
+addpath('Helper');
+addpath('DatasetGen');
 
 %% Begin definition of network variables
 
@@ -173,6 +174,9 @@ S_nu = zeros(1,n_samples);
 % Initialise a second statistic which tracks when the system is in the
 % pre-change state
 S_mu = zeros(1,n_samples);
+
+% Define the threshold for the CUSUM statistic
+h = 8;
  
 for i = [2:n_samples]
     % Get the observation vector for a time sample k
@@ -223,26 +227,19 @@ for i = [2:n_samples]
     S_nu(i) = max(0, S_nu(i-1) + log(1/N) - log(P_alpha));
     S_mu(i) = max(0, S_mu(i-1) + log(P_alpha) - log(1/N));
     
-    % Check whether to reset the opposite statistic
+    % Check whether to reset the opposite statistic for when a changepoint
+    % has been declared
+    if S_nu(i) > h && S_mu(i) > h
+        S_nu(i) = 0;
+        S_mu(i) = 0;
+    end
+        
 end
 
 % Cleanup
 clearvars Z_prev Z_new Z_ins B_cur
 
-%% Define the Mode Process Vector
-
-% Initialise an empty 2 x n_samples matrix to store the mode process
-% variable
-M_hat = zeros(2, n_samples);
-
-% Use indexing to calculate M_k = M(Z_k)
-M_hat(1,:) = Z_hat(1,:);
-M_hat(2,:) = 1 - Z_hat(1,:);
-
 %% Infimum Bound Stopping Time
-
-% Define the threshold for the CUSUM statistic
-h = 8;
 
 % Initialise a vector which stores the threshold crossing indices. Store as
 % -1 if no changepoint is detected within the common boundary.
@@ -266,12 +263,12 @@ for i = [1:length(lambda)]
    j = abs(lambda_cur);
    if lambda_cur > 0 % Pre-change to post-change case
     while j < abs(lambda_next) && ...
-            S_nu(j) < S_nu(abs(lambda_cur)) + h
+            S_nu(j) < h
         j = j + 1; % Increment search index
     end
    else % Post-change to pre-change
     while j < abs(lambda_next) && ...
-            S_nu(j) > S_nu(abs(lambda_cur)) - h
+            S_mu(j) < h
         j = j + 1; % Increment search index
     end
    end

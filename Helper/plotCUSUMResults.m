@@ -13,13 +13,29 @@ tau_trim = tau >= 0;
 figure
 hold on
 
-for i = 1:size(S,2)
+for i = 1:size(S,1)
     plot([1:n_samples],S(i,:)) % Plot likelihood of system in post-change
 end
 
-plot(nu_abs,S(nu_abs),'go') % Plot the change-point
-
-plot(tau(tau_trim),S(tau(tau_trim)),'ro') % Plot the stopping times
+if size(S,1) > 1
+    for i = 1:length(nu)
+        if nu(i) < 0
+            plot(nu_abs(i),S(1,nu_abs(i)),'go') % Plot the change-point
+            if tau(i) > -1
+                plot(tau(i),S(2,tau(i)),'ro') % Plot the stopping times
+            end
+        else
+            plot(nu_abs(i),S(2,nu_abs(i)),'go') % Plot the change-point
+            if tau(i) > -1
+                plot(tau(i),S(1,tau(i)),'ro') % Plot the stopping times
+            end
+        end
+    end
+    
+else
+    plot(nu_abs,S(nu_abs),'go') % Plot the change-point
+    plot(tau(tau_trim),S(tau(tau_trim)),'ro') % Plot the stopping times
+end
 
 for i = [1:length(h)]
     yline(h(i),'m--') % Plot the detection threshold
@@ -38,8 +54,7 @@ ylabel('$$\tilde{Z}_k$$','Interpreter','Latex')
 if size(S,2) > 1
     leg = legend('$$S_\nu$$ -- CUSUM Statistic',...
     '$$S_\mu$$ -- CUSUM Statistic',...
-    '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
-    '$$h_C$$ -- Threshold');
+    '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time');
 else
     leg = legend('$$S_\nu$$ -- CUSUM Statistic',...
     '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
@@ -48,8 +63,6 @@ end
 leg.Interpreter = 'Latex';
 leg.Color = 'w';
 xlim([0 n_samples])
-
-
 
 end
 
