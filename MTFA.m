@@ -15,7 +15,7 @@ addpath('DatasetGen')
 % Change the simulation command depending on what MTFA is required.
 
 % Define the number of trials to conduct
-n_trials = 500;
+n_trials = 200;
 
 % Define a mean and variance to test from
 var_mu = [ 1 1 1 ]; var_nu = [ 1 1 1 ];
@@ -65,12 +65,16 @@ mean_mu = [ 1 2 3 ]; mean_nu = [ 2 3 4 ];
 
 %% Static Mean
 
+lambda_sum = 0;
+
 stat = 0;
 for i = [1:n_trials]
    % Get a scenario for the simulation
-   [X,y,lambda] = simulate_deterministic_scenario(mean_mu, var_mu, mean_nu, ...
-       var_nu, 0);
-
+   [X,y,lambda] = simulate_random_scenario(mean_mu, var_mu, mean_nu, ...
+       var_nu);
+   
+   lambda_sum = lambda_sum + lambda;
+   
    % Define a threshold
    [~,~,~,stat_cur] = BayesianScenario(mean_mu, var_mu, mean_nu, ...
        var_nu, y, lambda);
@@ -83,3 +87,5 @@ for i = [1:n_trials]
    % Update the progress bar
    waitbar(i/n_trials);
 end
+
+lambda_avg = lambda_sum / n_trials;

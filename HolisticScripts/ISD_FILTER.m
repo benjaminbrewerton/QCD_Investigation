@@ -3,7 +3,8 @@ clc
 close all
 clearvars
 
-addpath('..');
+addpath('Helper');
+addpath('DatasetGen');
 
 %% Begin definition of network variables
 

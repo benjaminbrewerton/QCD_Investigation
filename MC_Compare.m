@@ -39,9 +39,9 @@ var_affected = [1 1 1];
 
 % Test a SNR vector between SNR_min <= SNR <= SNR_max using n_trials test
 % sequences
-SNR_min = -10;
-SNR_max = -5;
-n_trials = 10 + 1;
+SNR_min = -15;
+SNR_max = -10;
+n_trials = 20 + 1;
 
 % Form the SNR vector
 SNR = linspace(SNR_min, SNR_max, n_trials);
@@ -127,7 +127,7 @@ for i = [1:n_trials]
 
         % State sequence, observations and changepoint
         [X_D, y_D, nu_D] = simulate_deterministic_scenario(mean_unaffected,var_unaffected, ...
-            means(i,:),var_affected, 2000);
+            means(i,:),var_affected, 1878);
 
         %% Fetch the deterministic algorithm's performance
         % ==== DETERMINISTIC ====
@@ -157,7 +157,7 @@ for i = [1:n_trials]
         if ADD == -1 || PFA == -1 || tau == -1
             MC_D_FILTER = MC_D_FILTER + 1;
         elseif tau < nu_D
-            FA_D_RANDOM = FA_D_RANDOM + 1;
+            FA_D_FILTER = FA_D_FILTER + 1;
         else
             ADD_FILTER_D = ADD_FILTER_D + ADD;
             PFA_FILTER_D = PFA_FILTER_D + PFA;

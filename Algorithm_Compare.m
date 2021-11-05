@@ -26,7 +26,7 @@ if do_random_mean
         mean_unaffected(3)+rand()*random_mean_modifier(3)    ...
     ];%= [2 3 4];
 else
-    mean_affected = [2,3,4];
+    mean_affected = [1.3,2.3,3.3];
 end
 
 var_affected = [1 1 1];
