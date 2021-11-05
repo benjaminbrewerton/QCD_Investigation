@@ -53,7 +53,7 @@ for i = [1:n_trials]
 end
 
 %% Begin iterating around each SNR and running a number of trials
-n_scenarios = 200;
+n_scenarios = 300;
 
 % Store the results in matrices
 results_CUSUM_R = zeros(n_trials,3); % [ADD, MTFA, Tau]
@@ -98,6 +98,7 @@ for i = [1:n_trials]
         % Append results to SNR trial increment
         if ADD == -1 || MTFA == -1 || tau == -1
             MC_R_CUSUM = MC_R_CUSUM + 1;
+            ADD_CUSUM_R = ADD_CUSUM_R + 1e4;
         elseif tau < nu_B
             FA_R_CUSUM = FA_R_CUSUM + 1;
         else
@@ -115,6 +116,7 @@ for i = [1:n_trials]
         % Append results to SNR trial increment
         if ADD == -1 || PFA == -1 || tau == -1
             MC_R_FILTER = MC_R_FILTER + 1;
+            ADD_FILTER_R = ADD_FILTER_R + 1e4;
         elseif tau < nu_B
             FA_R_FILTER = FA_R_FILTER + 1;
         else
@@ -140,6 +142,7 @@ for i = [1:n_trials]
         % Append results to SNR trial increment
         if ADD == -1 || MTFA == -1 || tau == -1
             MC_D_CUSUM = MC_D_CUSUM + 1;
+            ADD_CUSUM_D = ADD_CUSUM_D + 1e4;
         elseif tau < nu_D
             FA_D_CUSUM = FA_D_CUSUM + 1;
         else
@@ -156,6 +159,7 @@ for i = [1:n_trials]
         % Append results to SNR trial increment
         if ADD == -1 || PFA == -1 || tau == -1
             MC_D_FILTER = MC_D_FILTER + 1;
+            ADD_FILTER_D = ADD_FILTER_D + 1e4;
         elseif tau < nu_D
             FA_D_FILTER = FA_D_FILTER + 1;
         else
@@ -218,4 +222,44 @@ ylim([0 1.05 * max([results_FILTER_D(:,1) results_CUSUM_D(:,1)],[],'ALL')])
 title('\textbf{Deterministic}', ...
     'Interpreter', 'Latex')
 xlabel('SNR (dB)')
+set(gca, 'color', [0 0.07 0.1 0.2])
+
+% Define a log of the results
+results_MC_log = log(results_MC);
+
+% PFA vs. ADD
+% Stopping Time
+figure
+
+% Random changepoint
+subplot(1,2,1)
+hold on
+colororder({'b','r'})
+yyaxis left
+plot(log(results_CUSUM_R(:,1)), results_MC_log(:,1),'b*') % CUSUM
+ylabel('CUSUM FAR','Interpreter','Latex')
+ylim([0 1.05 * max([results_MC_log(:,1) results_MC_log(:,2)],[],'ALL')])
+yyaxis right
+plot(log(results_FILTER_R(:,1)), results_MC_log(:,2),'r*') % HMM FILTER
+ylabel('HMM Filter PFA','Interpreter','Latex')
+ylim([0 1.05 * max([results_MC_log(:,1) results_MC_log(:,2)],[],'ALL')])
+title('\textbf{Random}', ...
+    'Interpreter', 'Latex')
+xlabel('ADD')
+set(gca, 'color', [0 0.07 0.1 0.2])
+
+subplot(1,2,2)
+hold on
+colororder({'b','r'})
+yyaxis left
+plot(log(results_CUSUM_D(:,1)), results_MC_log(:,3),'b*') % CUSUM
+ylabel('CUSUM FAR','Interpreter','Latex')
+ylim([0 1.05 * max([results_MC_log(:,1) results_MC_log(:,3)],[],'ALL')])
+yyaxis right
+plot(log(results_FILTER_D(:,1)), results_MC_log(:,4),'r*') % HMM FILTER
+ylabel('HMM Filter PFA','Interpreter','Latex')
+ylim([0 1.05 * max([results_MC_log(:,3) results_MC_log(:,4)],[],'ALL')])
+title('\textbf{Deterministic}', ...
+    'Interpreter', 'Latex')
+xlabel('ADD')
 set(gca, 'color', [0 0.07 0.1 0.2])
