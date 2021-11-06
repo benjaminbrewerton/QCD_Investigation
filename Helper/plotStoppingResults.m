@@ -11,10 +11,11 @@ nu_abs = abs(nu);
 
 if length(nu) > 1 || length(tau) > 1 % Multiple changepoints
     % Define the titles
-    titles = {'Pre-change Mode Process $$\hat{M}_k^1$$ vs. Samples k', ...
-        'Post-change Mode Process $$\hat{M}_k^2$$ vs. Samples k'};
-    legends = {'$$\hat{M}_k^1$$ -- $$P(X\in S_{\alpha})$$', ...
-        '$$\hat{M}_k^2$$ -- $$P(X\in S_{\beta})$$'};
+    titles = {'Pre-change Mode Process $$\hat{M}_k^\mu$$ vs. Samples k', ...
+        'Post-change Mode Process $$\hat{M}_k^\nu$$ vs. Samples k'};
+    legends = {'$$\hat{M}_k^\mu$$ -- $$P(X\in S_{\mu})$$', ...
+        '$$\hat{M}_k^\nu$$ -- $$P(X\in S_{\nu})$$'};
+    ytitles = {'\mu','\nu'};
     
     figure
     for j = [1:size(M_hat,1)]
@@ -43,7 +44,7 @@ if length(nu) > 1 || length(tau) > 1 % Multiple changepoints
         set(gca, 'color', [0 0.07 0.1 0.2])
         title(char(titles(j)),'Interpreter','Latex')
         xlabel('Sample k','Interpreter','Latex')
-        ylabel(['$$M_k^' num2str(j) '$$'],'Interpreter','Latex')
+        ylabel(['$$M_k^' ytitles{j} '$$'],'Interpreter','Latex')
         leg = legend(char(legends(j)),...
             '$$\nu$$ -- Changepoints', '$$\tau$$ -- Stopping Times', ...
             '$$h$$ -- Threshold');

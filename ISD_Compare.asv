@@ -37,9 +37,9 @@ var_affected = [1 1 1];
 
 % Test a SNR vector between SNR_min <= SNR <= SNR_max using n_trials test
 % sequences
-SNR_min = 0;
-SNR_max = -10;
-n_trials = 20 + 1;
+SNR_min = -10;
+SNR_max = -15;
+n_trials = 10 + 1;
 
 % Form the SNR vector
 SNR = linspace(SNR_min, SNR_max, n_trials);
@@ -85,49 +85,82 @@ for i = [1:n_trials]
         % ==== RANDOM ====
         % CUSUM
         % Set threshold:
-        h_cusum = 263;
-         [ADD,MTFA,~,~] = ISD_Deterministic(mean_unaffected,var_unaffected, ...
+        h_cusum = 14.1;
+         [ADD,MTFA,~,~] = ISD_Random(mean_unaffected,var_unaffected, ...
             means(i,:),var_affected, y_B, nu_B, h_cusum);
         % Append results to SNR trial increment
-        ADD_CUSUM_R = ADD_CUSUM_R + ADD;
-        MTFA_CUSUM_R = MTFA_CUSUM_R + MTFA;
+        if ADD == -1 || MTFA == -1 || tau == -1
+            MC_R_CUSUM = MC_R_CUSUM + 1;
+            ADD_CUSUM_R = ADD_CUSUM_R + 1e4;
+        elseif tau < nu_B
+            FA_R_CUSUM = FA_R_CUSUM + 1;
+        else
+            ADD_CUSUM_R = ADD_CUSUM_R + ADD;
+            MTFA_CUSUM_R = MTFA_CUSUM_R + MTFA;
+            tau_CUSUM_R = tau_CUSUM_R + tau;
+        end
         
         % HMM Filter
         % Set threshold:
-        h_bay = 0.998;
-        [ADD,MTFA,~,~] = ISD_Random(mean_unaffected,var_unaffected, ...
-            means(i,:),var_affected, y_B, nu_B, h_bay);
+        h_bay = 0.999701274462108;
+        [ADD,PFA,tau,~] = BayesianScenario(mean_unaffected, ...
+            var_unaffected, means(i,:), var_affected, y_B, nu_B, h_bay);
         
         % Append results to SNR trial increment
-        ADD_FILTER_R = ADD_FILTER_R + ADD;
-        PFA_FILTER_R = PFA_FILTER_R + MTFA;
-            
+        if ADD == -1 || PFA == -1 || tau == -1
+            MC_R_FILTER = MC_R_FILTER + 1;
+            ADD_FILTER_R = ADD_FILTER_R + 1e4;
+        elseif tau < nu_B
+            FA_R_FILTER = FA_R_FILTER + 1;
+        else
+            ADD_FILTER_R = ADD_FILTER_R + ADD;
+            PFA_FILTER_R = PFA_FILTER_R + PFA;
+            tau_FILTER_R = tau_FILTER_R + tau;
+        end
+
         %% GENERATED A DETERMINISTIC CHANGEPOINT SCENARIO
 
         % State sequence, observations and changepoint
         % State sequence, observations and changepoint
         [X_D, y_D, nu_D] = simulate_ISD_scenario(mean_unaffected,var_unaffected, ...
-            means(i,:),var_affected, 10);
+    means(i,:),var_affected, 10);
 
         %% Fetch the deterministic algorithm's performance
         % ==== DETERMINISTIC ====
-        h_cusum = 259;
+
         % CUSUM
-        [ADD,MTFA,~,~] = ISD_Deterministic(mean_unaffected,var_unaffected, ...
-            means(i,:),var_affected, y_D, nu_D, h_cusum);
+        h_cusum = 12.806962979038087;
+        [ADD,MTFA,tau,~] = CUSUMScenario(mean_unaffected, ...
+            var_unaffected, means(i,:), var_affected, y_D, nu_D, h_cusum);
         
         % Append results to SNR trial increment
-        ADD_CUSUM_D = ADD_CUSUM_D + ADD;
-        MTFA_CUSUM_D = MTFA_CUSUM_D + MTFA;
+        if ADD == -1 || MTFA == -1 || tau == -1
+            MC_D_CUSUM = MC_D_CUSUM + 1;
+            ADD_CUSUM_D = ADD_CUSUM_D + 1e4;
+        elseif tau < nu_D
+            FA_D_CUSUM = FA_D_CUSUM + 1;
+        else
+            ADD_CUSUM_D = ADD_CUSUM_D + ADD;
+            MTFA_CUSUM_D = MTFA_CUSUM_D + MTFA;
+            tau_CUSUM_D = tau_CUSUM_D + tau;  
+        end
         
-        h_bay = 0.9985;
         % HMM Filter
-        [ADD,MTFA,~,~] = ISD_Random(mean_unaffected,var_unaffected, ...
-            means(i,:),var_affected, y_D, nu_D, h_bay);
+        h_bay = 0.995;
+        [ADD,PFA,tau,~] = BayesianScenario(mean_unaffected, ...
+            var_unaffected, means(i,:), var_affected, y_D, nu_D, h_bay);
         
         % Append results to SNR trial increment
-        ADD_FILTER_D = ADD_FILTER_D + ADD;
-        PFA_FILTER_D = PFA_FILTER_D + MTFA;
+        if ADD == -1 || PFA == -1 || tau == -1
+            MC_D_FILTER = MC_D_FILTER + 1;
+            ADD_FILTER_D = ADD_FILTER_D + 1e4;
+        elseif tau < nu_D
+            FA_D_FILTER = FA_D_FILTER + 1;
+        else
+            ADD_FILTER_D = ADD_FILTER_D + ADD;
+            PFA_FILTER_D = PFA_FILTER_D + PFA;
+            tau_FILTER_D = tau_FILTER_D + tau; 
+        end
         
         waitbar(((i*n_scenarios) + j - 1)/(n_trials*n_scenarios));
    end
@@ -191,14 +224,14 @@ figure
 subplot(1,2,1)
 hold on
 colororder({'b','r'})
-yyaxis right
-plot(log(results_CUSUM_R(:,1)), log(results_CUSUM_R(:,2)),'r*') % CUSUM
-ylabel('CUSUM FAR','Interpreter','Latex')
-ylim([0 1.05 * max([log(results_CUSUM_R(:,2)) log(results_FILTER_R(:,2))],[],'ALL')])
 yyaxis left
-plot(log(results_FILTER_R(:,1)), log(results_FILTER_R(:,2)),'b*') % HMM FILTER
+plot(log(results_CUSUM_R(:,1)), results_MC_log(:,1),'b*') % CUSUM
+ylabel('CUSUM FAR','Interpreter','Latex')
+ylim([0 1.05 * max([results_MC_log(:,1) results_MC_log(:,2)],[],'ALL')])
+yyaxis right
+plot(log(results_FILTER_R(:,1)), results_MC_log(:,2),'r*') % HMM FILTER
 ylabel('HMM Filter PFA','Interpreter','Latex')
-ylim([0 1.05 * max([log(results_CUSUM_R(:,2)) log(results_FILTER_R(:,2))],[],'ALL')])
+ylim([0 1.05 * max([results_MC_log(:,1) results_MC_log(:,2)],[],'ALL')])
 title('\textbf{Random}', ...
     'Interpreter', 'Latex')
 xlabel('ADD')
@@ -207,14 +240,14 @@ set(gca, 'color', [0 0.07 0.1 0.2])
 subplot(1,2,2)
 hold on
 colororder({'b','r'})
-yyaxis right
-plot(log(results_CUSUM_D(:,1)), log(results_CUSUM_D(:,2)),'r*') % CUSUM
-ylabel('CUSUM FAR','Interpreter','Latex')
-ylim([0 1.05 * max([log(results_CUSUM_D(:,2)) log(results_FILTER_D(:,2))],[],'ALL')])
 yyaxis left
-plot(log(results_FILTER_D(:,1)), log(results_FILTER_D(:,2)),'b*') % HMM FILTER
+plot(log(results_CUSUM_D(:,1)), results_MC_log(:,3),'b*') % CUSUM
+ylabel('CUSUM FAR','Interpreter','Latex')
+ylim([0 1.05 * max([results_MC_log(:,1) results_MC_log(:,3)],[],'ALL')])
+yyaxis right
+plot(log(results_FILTER_D(:,1)), results_MC_log(:,4),'r*') % HMM FILTER
 ylabel('HMM Filter PFA','Interpreter','Latex')
-ylim([0 1.05 * max([log(results_CUSUM_D(:,2)) log(results_FILTER_D(:,2))],[],'ALL')])
+ylim([0 1.05 * max([results_MC_log(:,3) results_MC_log(:,4)],[],'ALL')])
 title('\textbf{Deterministic}', ...
     'Interpreter', 'Latex')
 xlabel('ADD')

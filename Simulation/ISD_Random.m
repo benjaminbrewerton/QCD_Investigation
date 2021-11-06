@@ -141,6 +141,13 @@ M_hat = zeros(2, n_samples);
 M_hat(1,:) = Z_hat(1,:);
 M_hat(2,:) = 1 - Z_hat(1,:);
 
+if ~exist('h','var')
+    ADD = 0;
+    PFA = 0;
+    tau = 0;
+    return
+end
+
 %% Infimum Bound Stopping Time
 
 % Get the mode statistic for when the system is in post-change
@@ -190,10 +197,13 @@ clearvars M_stat
 
 %% Calculate performance parameters
 
-% Average Detection Delay
-ADD = mean(abs(abs(lambda) - tau));
+DD = tau - abs(lambda);
 
 % Probability of False Alarm
-PFA = 0;
+PFA = sum(DD < 0);
+
+% Average Detection Delay
+DD(DD < 0) = n_samples;
+ADD = mean(DD);
 
 end

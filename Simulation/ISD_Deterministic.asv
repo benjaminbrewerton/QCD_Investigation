@@ -122,7 +122,7 @@ if ~exist('h','var')
     ADD = 0;
     PFA = 0;
     tau = 0;
-    S = [S_mu ; S_nu];
+    
     return
 end
 

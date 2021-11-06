@@ -11,49 +11,49 @@ rng(5);
 % Number of sensors
 n_sensors = 3;
 
-%% Produce a set of statistical SNRs for testing
+do_random_mean = 0;
 
+addpath('Simulation');
+addpath('DatasetGen');
+
+%% Define the means and variance parameters
+
+% Assume the sensors observation measurements are i.i.d.
+
+% Each sensor's default distribution without being affected by a target
+% will be a standard normal distribution with sigma = 1 and mean = [1 2 3]
+mean_unaffected = [1,2,3];
+var_unaffected = [1 1 1];
+
+if do_random_mean
+    mean_affected = [                                        ...
+        mean_unaffected(1)+rand()*random_mean_modifier(1),   ...
+        mean_unaffected(2)+rand()*random_mean_modifier(2),   ...
+        mean_unaffected(3)+rand()*random_mean_modifier(3)    ...
+    ];%= [2 3 4];
+else
+    mean_affected = [2,3,4];
+end
+
+% Use a static variance and changing mean
+var_affected = [1 1 1];
+
+% Generate a vector of SNRs to test with
 % Assume the SNR will be measured in dB = 10*log10(P)
 
 % Test a SNR vector between SNR_min <= SNR <= SNR_max using n_trials test
 % sequences
 SNR_min = -5;
-SNR_max = 15;
-n_trials = 61;
+SNR_max = 10;
+n_trials = 30 + 1;
 
 % Form the SNR vector
 SNR = linspace(SNR_min, SNR_max, n_trials);
 
-%% Produce Means and Variances from the SNR vector
-
-% Assume static means for the affected and unaffected distribution
-% sequences. The variance will be changed according to the SNR
-mean_unaffected = [1 2 3];
-mean_affected = [2 3 4];
-
-% Create some static variances as well for testing
-var_unaffected = [1 1 1];
-var_affected = [1 1 1];
-
-% Define the limits of Variance
-% Unaffected
-a = min(var_unaffected); % Top limit
-b = max(var_unaffected); % Bottom limit
-
-% Affected
-c = min(var_affected); % Top limit
-d = max(var_affected); % Bottom limit
-
-% Create a matrix which holds the affected and unaffected variances
-vars_unaffected = zeros(n_trials,n_sensors);
-vars_affected = zeros(n_trials,n_sensors);
-% Iterate to fill the variance matrices
+means = zeros(n_trials,length(mean_unaffected));
+% Determine the new means to test with depending on the desired SNR
 for i = [1:n_trials]
-    vars_unaffected(i,:) = mean_unaffected ./ db2pow(SNR(i));
-    vars_affected(i,:) = mean_affected ./ db2pow(SNR(i));
-    % Use a random variance to simulate with
-%     vars_unaffected(i,:) = a + (b-a) .* rand(n_sensors,1);
-%     vars_affected(i,:) = c + (d-c) .* rand(n_sensors,1);
+    means(i,:) = var_unaffected .* db2pow(SNR(i)) + mean_unaffected;
 end
 
 %% Testing Scenarios
@@ -73,8 +73,12 @@ h = waitbar(0, 'Simulation Progress');
 % unaffected and affected distributions
 for i = [1:n_trials]
     for j = [1:n_scenarios]
-        [c_ADD, c_PFA, ~, ~] = BayesianScenario(vars_unaffected(i,:), ...
-            var_unaffected,  vars_affected(i,:), var_affected);
+         % State sequence, observations and changepoint
+        [X_B, y_B, nu_B] = simulate_random_scenario(mean_unaffected,var_unaffected, ...
+            means(i,:),var_affected);
+        
+        [c_ADD, c_PFA, ~, ~] = BayesianScenario(mean_unaffected, ...
+            var_unaffected,  means(i,:), var_affected, y_B, nu_B, 0.995);
         
         % Check if the change was detected at all
         if isempty(c_ADD) || isempty(c_PFA)
@@ -84,7 +88,7 @@ for i = [1:n_trials]
             ADD_cv(j,i) = c_ADD;
             PFA_cv(j,i)  = c_PFA;
         end
-        waitbar(((i*n_scenarios) + j)/(n_trials*n_scenarios));
+        waitbar(((i*n_scenarios) + (j-1))/(n_trials*n_scenarios));
     end
 end
 
@@ -117,6 +121,6 @@ ylabel('Average Detection Delay','Interpreter','Latex')
 yyaxis right
 plot(SNR, mean(PFA_cv,1),'m.') % PFA
 ylabel('Average Probability of False Alarm','Interpreter','Latex')
-title('ADD and PFA vs. distribution SNR')
+title('ADD and PFA vs. SNR')
 xlabel('SNR (dB)')
 set(gca, 'color', [0 0.07 0.1 0.2])

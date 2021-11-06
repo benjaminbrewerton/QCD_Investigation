@@ -19,7 +19,7 @@ n_trials = 200;
 
 % Define a mean and variance to test from
 var_mu = [ 1 1 1 ]; var_nu = [ 1 1 1 ];
-mean_mu = [ 1 2 3 ]; mean_nu = [ 2 3 4 ];
+mean_mu = [ 1 2 3 ]; mean_nu = [1.3 2.3 3.3];
 
 %% Execution for varying mean
 % 
@@ -65,18 +65,15 @@ mean_mu = [ 1 2 3 ]; mean_nu = [ 2 3 4 ];
 
 %% Static Mean
 
-lambda_sum = 0;
-
 stat = 0;
 for i = [1:n_trials]
    % Get a scenario for the simulation
-   [X,y,lambda] = simulate_random_scenario(mean_mu, var_mu, mean_nu, ...
-       var_nu, 0);
+   [X,y,lambda] = simulate_ISD_scenario(mean_mu, var_mu, mean_nu, ...
+       var_nu,10);
    
-   lambda_sum = lambda_sum + lambda;
    
    % Define a threshold
-   [~,~,~,stat_cur] = BayesianScenario(mean_mu, var_mu, mean_nu, ...
+   [~,~,~,stat_cur] = ISD_Random(mean_mu, var_mu, mean_nu, ...
        var_nu, y, lambda);
 
    % Compare the stat with known maximum
@@ -87,5 +84,3 @@ for i = [1:n_trials]
    % Update the progress bar
    waitbar(i/n_trials);
 end
-
-lambda_avg = lambda_sum / n_trials;
