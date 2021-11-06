@@ -79,16 +79,6 @@ end
 
 %% Determine the transition points
 
-% Define a new matrix, e, which will hold a 1 in the row where the current
-% position in the state vector is
-e = zeros(n_states,n_samples);
-
-% Loop around the state vector and place a 1 in the e vector in the
-% appropriate column
-for i = [1:n_samples]
-   e(X(i),i) = 1; 
-end
-
 % Fetch the transition points from the state sequence X
 trans = getTransitionIndices(X);
 

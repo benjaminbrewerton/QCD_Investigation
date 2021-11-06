@@ -33,7 +33,7 @@ if size(S,1) > 1
     end
     
 else
-    plot(nu_abs,S(nu_abs),'go') % Plot the change-point
+    xline(nu_abs,'g--') % Plot the change-point
     plot(tau(tau_trim),S(tau(tau_trim)),'ro') % Plot the stopping times
 end
 
@@ -51,7 +51,7 @@ title('CUSUM Test Statistic $$\tilde{Z}_k$$ vs. Samples k','Interpreter','Latex'
 xlabel('Sample k','Interpreter','Latex')
 ylabel('$$\tilde{Z}_k$$','Interpreter','Latex')
 
-if size(S,2) > 1
+if size(S,1) > 1
     leg = legend('$$S_\nu$$ -- CUSUM Statistic',...
     '$$S_\mu$$ -- CUSUM Statistic',...
     '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time');

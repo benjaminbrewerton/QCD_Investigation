@@ -296,10 +296,14 @@ plotStoppingResults(lambda, tau, M_hat, h);
 %% Calculate performance parameters
 
 % Average Detection Delay
-ADD = mean(abs(abs(lambda) - tau));
+DD = tau - abs(lambda);
+DD(tau == -1) = n_samples;
+
+ADD = mean(DD);
 
 % Probability of False Alarm
 %PFA = 1 - M_hat(2,tau);
+PFA = 0;
 
 %% Cleanup
 clearvars i j

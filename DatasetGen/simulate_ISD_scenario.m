@@ -46,7 +46,7 @@ pi_nu = ones(1,n_states_nu) ./ n_states_nu;
 %% Generate the state randoms and changepoint
 
 % Check whether the changepoint is already supplied
-if ~exist('nu','var')
+if ~exist('lambda','var')
     if changepoints < 0 % Random dataset
         % Bayesian Probability Space Assumptions
 

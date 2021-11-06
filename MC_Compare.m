@@ -206,6 +206,7 @@ ylim([0 1.05 * max([results_FILTER_R(:,1) results_CUSUM_R(:,1)],[],'ALL')])
 title('\textbf{Random}', ...
     'Interpreter', 'Latex')
 xlabel('SNR (dB)')
+xlim([SNR(1) SNR(end)])
 set(gca, 'color', [0 0.07 0.1 0.2])
 
 subplot(1,2,2)
@@ -222,6 +223,7 @@ ylim([0 1.05 * max([results_FILTER_D(:,1) results_CUSUM_D(:,1)],[],'ALL')])
 title('\textbf{Deterministic}', ...
     'Interpreter', 'Latex')
 xlabel('SNR (dB)')
+xlim([SNR(1) SNR(end)])
 set(gca, 'color', [0 0.07 0.1 0.2])
 
 % Define a log of the results
@@ -236,12 +238,12 @@ subplot(1,2,1)
 hold on
 colororder({'b','r'})
 yyaxis left
-plot(log(results_CUSUM_R(:,1)), results_MC_log(:,1),'b*') % CUSUM
-ylabel('CUSUM FAR','Interpreter','Latex')
+plot(log(results_CUSUM_R(:,1)), results_MC_log(:,1),'r*') % CUSUM
+ylabel('HMM Filter FAR','Interpreter','Latex')
 ylim([0 1.05 * max([results_MC_log(:,1) results_MC_log(:,2)],[],'ALL')])
 yyaxis right
-plot(log(results_FILTER_R(:,1)), results_MC_log(:,2),'r*') % HMM FILTER
-ylabel('HMM Filter PFA','Interpreter','Latex')
+plot(log(results_FILTER_R(:,1)), results_MC_log(:,2),'b*') % HMM FILTER
+ylabel('CUSUM PFA','Interpreter','Latex')
 ylim([0 1.05 * max([results_MC_log(:,1) results_MC_log(:,2)],[],'ALL')])
 title('\textbf{Random}', ...
     'Interpreter', 'Latex')
@@ -252,12 +254,12 @@ subplot(1,2,2)
 hold on
 colororder({'b','r'})
 yyaxis left
-plot(log(results_CUSUM_D(:,1)), results_MC_log(:,3),'b*') % CUSUM
-ylabel('CUSUM FAR','Interpreter','Latex')
+plot(log(results_CUSUM_D(:,1)), results_MC_log(:,3),'r*') % CUSUM
+ylabel('HMM Filter FAR','Interpreter','Latex')
 ylim([0 1.05 * max([results_MC_log(:,1) results_MC_log(:,3)],[],'ALL')])
 yyaxis right
-plot(log(results_FILTER_D(:,1)), results_MC_log(:,4),'r*') % HMM FILTER
-ylabel('HMM Filter PFA','Interpreter','Latex')
+plot(log(results_FILTER_D(:,1)), results_MC_log(:,4),'b*') % HMM FILTER
+ylabel('CUSUM PFA','Interpreter','Latex')
 ylim([0 1.05 * max([results_MC_log(:,3) results_MC_log(:,4)],[],'ALL')])
 title('\textbf{Deterministic}', ...
     'Interpreter', 'Latex')

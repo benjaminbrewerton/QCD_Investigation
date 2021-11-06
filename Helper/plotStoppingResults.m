@@ -58,15 +58,15 @@ else % Singular changepoint
     hold on
 
     plot([1:n_samples],M_hat) % Plot likelihood of system in post-change
-    plot(nu,M_hat(nu),'go') % Plot the change-point
+    xline(nu,'g--') % Plot the change-points
     plot(tau,M_hat(tau),'ro') % Plot the stopping time
     yline(h,'m--') % Plot the detection threshold
 
     set(gca, 'color', [0 0.07 0.1 0.2])
     title('Post-change Mode Process $$\hat{M}_k^2$$ vs. Samples k','Interpreter','Latex')
     xlabel('Sample k','Interpreter','Latex')
-    ylabel('$$M_k^2$$','Interpreter','Latex')
-    leg = legend('$$\hat{M}_k^2$$ -- $$P(X\in S_{\beta})$$',...
+    ylabel('$$\hat{M}_k$$','Interpreter','Latex')
+    leg = legend('$$\hat{M}_k$$ -- $$P(Z_k\in S_{\nu})$$',...
         '$$\nu$$ -- Changepoint', '$$\tau$$ -- Stopping Time', ...
         '$$h$$ -- Threshold');
     leg.Interpreter = 'Latex';

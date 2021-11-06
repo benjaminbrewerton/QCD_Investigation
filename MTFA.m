@@ -71,7 +71,7 @@ stat = 0;
 for i = [1:n_trials]
    % Get a scenario for the simulation
    [X,y,lambda] = simulate_random_scenario(mean_mu, var_mu, mean_nu, ...
-       var_nu);
+       var_nu, 0);
    
    lambda_sum = lambda_sum + lambda;
    

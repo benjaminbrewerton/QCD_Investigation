@@ -230,10 +230,12 @@ for i = [2:n_samples]
     % Check whether to reset the opposite statistic for when a changepoint
     % has been declared
     if S_nu(i) > h && S_mu(i) > h
-        S_nu(i) = 0;
-        S_mu(i) = 0;
+        if S_nu(i-1) < h && S_nu(i) > h
+            S_mu(i) = 0;
+        elseif S_mu(i-1) < h && S_mu(i) > h
+            S_nu(i) = 0;
+        end
     end
-        
 end
 
 % Cleanup
@@ -289,13 +291,14 @@ plotCUSUMResults([S_nu ; S_mu], [], lambda, tau);
 %% Calculate performance parameters
 
 % Average Detection Delay
-DD = abs(abs(lambda) - tau);
-DD(tau == -1) = -1;
+DD = tau - abs(lambda);
+DD(tau == -1) = [];
 
-ADD = mean(abs(abs(lambda) - tau));
+ADD = mean(DD);
 
 % Probability of False Alarm
 %PFA = 1 - M_hat(2,tau);
+MTFA = 1e4;
 
 %% Cleanup
 clearvars i j
