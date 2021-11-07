@@ -51,7 +51,7 @@ for i = [1:n_trials]
 end
 
 %% Begin iterating around each SNR and running a number of trials
-n_scenarios = 20;
+n_scenarios = 200;
 
 % Store the results in matrices
 results_CUSUM_R = zeros(n_trials,3); % [ADD, MTFA, Tau]
